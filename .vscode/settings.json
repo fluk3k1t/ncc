@@ -1,0 +1,23 @@
+{
+    "files.associations": {
+        "*.ino": "bat",
+        "test.h": "c",
+        "sstream": "c",
+        "format": "c",
+        "stdio.h": "c",
+        "tokenizer.h": "c",
+        "system_error": "c",
+        "gtest.h": "c",
+        "any": "c",
+        "charconv": "cpp",
+        "array": "c",
+        "compare": "c",
+        "complex": "c",
+        "functional": "c",
+        "ratio": "c",
+        "tuple": "c",
+        "type_traits": "c",
+        "utility": "c",
+        "variant": "c"
+    }
+}
