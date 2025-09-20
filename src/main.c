@@ -3,7 +3,7 @@
 #include <parser.h>
 
 int main(int argc, char *argv[]) {
-    char *code = "*[*]";
+    char *code = "(*)[*][*]";
     
     token_t *token = tokenize(code);
     // show_token(token);

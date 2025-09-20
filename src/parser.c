@@ -163,9 +163,9 @@ type_t *abstract_decrarator(type_t *base) {
 
 type_t *direct_abstract_declaration_partial(type_t *base) {
     if (peek("[")) {
+        type_t *head = base;
 
         while (1) {
-            type_t *head = base;
 
             consume("[");
             if (peek("*")) {
@@ -175,9 +175,6 @@ type_t *direct_abstract_declaration_partial(type_t *base) {
                 type_t *array = new_type(ARRAY);
                 array->ptr = head;
                 head = array;
-            } else {
-                printf("unimplemented\n");
-                exit(1);
             } else {
                 break;
             }
@@ -196,71 +193,19 @@ type_t *direct_abstract_declarator(type_t *base) {
         expect(")");
 
         if (ad->kind == PTR) {
-            type_t *head = base;
-
-            if (cur->str != NULL && cur->str[0] == '[') {
-                while (1) {
-                    if (cur->next == NULL) {
-                        break;
-                    }
-                    if (cur->next->str != NULL && cur->next->str[0] == '*') {
-                        // printf("array\n");
-                        consume("[");
-                        expect("*");
-                        expect("]");
-                        
-                        type_t *array = (type_t *)calloc(1, sizeof(type_t));
-                        array->kind = ARRAY;
-                        array->ptr = head;
-                        head = array;
-                        printf("array\n");
-                    } else if (consume("[")) {
-                        printf('unimplemented\n');
-                    } else {
-                        printf("break\n");
-                        break;
-                    }
-                }
-
-                ad->ptr = head;
-                return ad;
-            } else {
-                return ad;
-            }
+            type_t *t = direct_abstract_declaration_partial(base);
+            ad->ptr = t;
+            return ad;
         } else {
-            printf("unreachable!\n");
+            printf("1unreachable!\n");
             exit(1);
         }
-    } else if (cur->str[0] == '[') {
-            type_t *head = base;
-            if (cur->str != NULL && cur->str[0] == '[') {
-                while (1) {
-                    if (cur->next == NULL) {
-                        break;
-                    }
-                    if (cur->next->str != NULL && cur->next->str[0] == '*') {
-                        // printf("array\n");
-                        consume("[");
-                        expect("*");
-                        expect("]");
-                        
-                        type_t *array = (type_t *)calloc(1, sizeof(type_t));
-                        array->kind = ARRAY;
-                        array->ptr = head;
-                        head = array;
-                        printf("array\n");
-                    } else if (consume("[")) {
-                        printf('unimplemented\n');
-                    } else {
-                        printf("break\n");
-                        break;
-                    }
-                }
-
-                return head;
-            }
+    } else if (peek("[")) {
+        return direct_abstract_declaration_partial(base);
     } else {
-        
+        printf("3unreachable! %s\n", cur->str);
+        // exit(1);
+        return NULL;
     }
 }
 
