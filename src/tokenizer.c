@@ -1,7 +1,8 @@
 #include <tokenizer.h>
 
 const char *puncts[] = {"==", "!=", "<=", ">=", "->", "<", ">", "+", "-", "*", "/", "(", ")", "=", ";", "{", "}", ",", "&", "[", "]", "."};
-const char *types[] = {"char", "short", "int", "long", "void", "struct", "typedef"};
+const char *types[] = {"char", "short", "int", "long", "void", "struct", "typedef", "float", "unsigned"};
+const unsigned int types_len = sizeof(types) / sizeof(types[0]);
 const char *keywords[] = {"return", "if", "else", "while", "for"};
 
 bool is_alnum(char c) {

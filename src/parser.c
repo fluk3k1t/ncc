@@ -3,7 +3,8 @@
 #include <stdio.h>
 #include <tokenizer.h>
 
-token_t *cur = NULL;
+static token_t *cur = NULL;
+static node_t *backtrack = NULL;
 
 void put_indent(int level) {
     for (int i = 0; i < level; i++) {
@@ -45,177 +46,95 @@ void show_node_with_indent(node_t *node, int level) {
             show_node_with_indent(node->lhs, level + 1);
             show_node_with_indent(node->rhs, level + 1);
             break;
+        case ND_IDENT: 
+            put_indent(level); printf("ND_IDENT: '%.*s'\n", node->len, node->str);
+            break;
+        case ND_TYPE_SPECIFIER:
+            put_indent(level); printf("ND_TYPE_SPECIFIER: '%.*s'\n", node->len, node->str);
+            if (node->next) {
+                show_node_with_indent(node->next, level);
+            }
+            break;
+        case ND_DECLARATION:
+            put_indent(level); printf("ND_DECLARATION: \n");
+            show_node_with_indent(node->share.declaration.decl_specs, level + 1);
+            if (node->share.declaration.init_decl_list_opt) {
+                show_node_with_indent(node->share.declaration.init_decl_list_opt, level + 1);
+            }
+            break;
+        case ND_DECLARATOR:
+            put_indent(level); printf("ND_DECLARATOR: \n");
+            if (node->share.declarator.ptr_opt) {
+                show_node_with_indent(node->share.declarator.ptr_opt, level + 1);
+            }
+            show_node_with_indent(node->share.declarator.direct_decl, level + 1);
+            break;
+        case ND_DIRECT_DECLARATOR:
+            put_indent(level); printf("ND_DIRECT_DECLARATOR:\n");
+            if (node->share.direct_declarator.ident) {
+                put_indent(level + 1); printf("Identifier: \n");
+                show_node_with_indent(node->share.direct_declarator.ident, level + 2);
+            } else if (node->share.direct_declarator.braced_declarator) {
+                put_indent(level + 1); printf("Braced: \n");
+                show_node_with_indent(node->share.direct_declarator.braced_declarator, level + 2);
+            }
+
+            if (node->share.direct_declarator.array) {
+                put_indent(level + 1); printf("Array: \n");
+                show_array_with_indent(node->share.direct_declarator.array, level + 2);
+            }
+            // TODO: show marr as ini 
+            break;
+        case ND_INIT_DECLARATOR:
+            put_indent(level); printf("ND_INIT_DECLARATOR:\n");
+            show_node_with_indent(node->lhs, level + 1);
+            if (node->rhs) {
+                show_node_with_indent(node->rhs, level + 1);
+            } else {
+                put_indent(level + 1); printf("initializer: None\n");
+            }
+            break;
+        case ND_POINTER:
+            put_indent(level); printf("ND_POINTER: *\n");
+            if (node->share.pointer.tqs_opt) {
+                put_indent(level + 1); printf("type qualifier list optional, but not show yet\n");
+            } 
+            if (node->share.pointer.ptr_opt) {
+                show_node_with_indent(node->share.pointer.ptr_opt, level + 1);
+            }
+            break;
         default:
             printf("default");
             break;
     }
 }
 
-
-void show_type(type_t *type) {
-    show_type_with_indent(type, 0);
-    printf("\n");
-}
-
-void show_type_with_indent(type_t *type, int level) {
-    if (type == NULL) {
-        printf("show_type_with_indent: type is NULL\n");
-        // exit(1);
-        return;
-    }
-
-    switch (type->kind) {
-        case VOID:
-            printf("void");
-            break;
-        case CHAR:
-            printf("char");
-            break;
-        case SHORT:
-            printf("short");
-            break;
-        case INT:
-            printf("int");
-            break;
-        case LONG:
-            printf("long");
-            break;
-        case PTR:
-            printf("%.*s", type->len, type->name);
-            printf("* -> ");
-            show_type_with_indent(type->ptr, level);
-            break;
-        case ARRAY:
-            printf("array:\n");
-            show_type_with_indent(type->ptr, level+1);
-            break;
-        default:
-            printf("default\n");
-            break;
+void show_array_with_indent(array_t *array, int level) {
+    put_indent(level); printf("[%d]\n", array->len);
+    if (array->next) {
+        show_array_with_indent(array->next, level + 1);
     }
 }
 
 node_t *parse(token_t *token) {
     cur = token;
 
-    node_t *e = expression();
+    node_t *e = declaration();
     
     return e;
 }
 
-type_t *new_type(type_kind_t kind) {
-    type_t *type = (type_t *)calloc(1, sizeof(type_t));
-    type->kind = kind;
-    return type;
-}
+node_t *identifier() {
+    if (cur->kind == TK_IDENT) {
+        node_t *ident = new_node(ND_IDENT);
+        ident->str = cur->str;
+        ident->len = cur->len;
 
-type_t *parse_type(token_t *token) {
-    cur = token;
-
-    type_t *int_ = (type_t *)calloc(1, sizeof(type_t));
-    int_->kind = INT;
-    type_t *t = abstract_decrarator(int_);
-
-    return t;
-}
-
-token_t *rollback = NULL;
-
-type_t *declaration_specifiers() {
-
-}
-
-type_t *pointer(type_t *base) {
-    if (consume("*")) {
-        type_t *ptr = (type_t *)calloc(1, sizeof(type_t));
-        ptr->kind = PTR;
-        ptr->ptr = base;
-        return ptr;
+        cur = cur->next;
+        return ident;
     } else {
-        return base;
-    }
-}
-
-type_t *type_name() {
-
-}
-
-type_t *abstract_decrarator(type_t *base) {
-    rollback = cur;
-
-    //
-    type_t *ptr_opt = pointer(base);
-    type_t *opt = direct_abstract_declarator(ptr_opt);
-    if (opt) {
-        return opt;
-    }
-
-    cur = rollback;
-
-    //
-    expect("*");
-
-    type_t *type = (type_t *)calloc(1, sizeof(type_t));
-    type->kind = PTR;
-    type->ptr = base;
-    return type;
-}
-
-type_t *direct_abstract_declaration_partial(type_t *base) {
-    if (peek("[")) {
-        type_t *head = base;
-
-        while (1) {
-
-            consume("[");
-            if (peek("*")) {
-                consume("*");
-                expect("]");
-
-                type_t *array = new_type(ARRAY);
-                array->ptr = head;
-                head = array;
-            } else {
-                break;
-            }
-        }
-
-        return head;
-    } else if (peek("(")) {
-
-    } 
-}
-
-type_t *direct_abstract_declarator(type_t *base) {
-    if (consume("(")) {
-        printf("direct\n");
-        type_t *ad = abstract_decrarator(NULL);
-        expect(")");
-
-        if (ad->kind == PTR) {
-            type_t *t = direct_abstract_declaration_partial(base);
-            ad->ptr = t;
-            return ad;
-        } else {
-            printf("1unreachable!\n");
-            exit(1);
-        }
-    } else if (peek("[")) {
-        return direct_abstract_declaration_partial(base);
-    } else {
-        printf("3unreachable! %s\n", cur->str);
-        // exit(1);
         return NULL;
     }
-}
-
-node_t *type_specifier() {
-    // node_t *ts = (node_t *)calloc(1, sizeof(node_t));
-    // ts->kind = ND_TYPE_SPECIFIER;
-
-    // if (type("int")) {
-    //     return ts;
-    // }
 }
 
 node_t *constant() {
@@ -251,9 +170,9 @@ node_t *multiplicative_expression() {
 
     while (1) {
         if (consume("*")) {
-            cur = new_node(ND_MUL, cur, primary_expression());
+            cur = new_node_with(ND_MUL, cur, primary_expression());
         } else if (consume("/")) {
-            cur = new_node(ND_DIV, cur, primary_expression());
+            cur = new_node_with(ND_DIV, cur, primary_expression());
         } else {
             break;
         }
@@ -267,9 +186,9 @@ node_t *additive_expression() {
 
     while (1) {
         if (consume("+")) {
-            cur = new_node(ND_ADD, cur, multiplicative_expression());
+            cur = new_node_with(ND_ADD, cur, multiplicative_expression());
         } else if (consume("-")) {
-            cur = new_node(ND_SUB, cur, multiplicative_expression());
+            cur = new_node_with(ND_SUB, cur, multiplicative_expression());
         } else {
             break;
         }
@@ -280,6 +199,198 @@ node_t *additive_expression() {
 
 node_t *expression() {
     node_t *e = additive_expression();
+}
+
+// A.2.2 Declarations
+// (6.7)
+node_t *declaration() {
+    token_t *_backtrack = cur;
+
+    node_t *decl_specs = declaration_specifiers();
+    if (!decl_specs) return NULL;
+
+    // optional !!
+    node_t *init_decl_list_opt = init_declarator_list();
+
+    expect(";");
+    
+    node_t *decl = new_node(ND_DECLARATION);
+    decl->share.declaration.decl_specs = decl_specs;
+    decl->share.declaration.init_decl_list_opt = init_decl_list_opt;
+    return decl;
+}
+
+// (6.7)
+node_t *declaration_specifiers() {
+    node_t *cur = (node_t *)calloc(1, sizeof(node_t));
+    node_t *head = cur;
+
+    while (1) {
+        node_t *type_spec = type_specifier();
+        if (type_spec) {
+            cur->next = type_spec;
+            cur = type_spec;
+            continue;
+        }
+
+        break;
+    }
+
+    return head->next;
+}
+
+// (6.7)
+node_t *init_declarator_list() {
+    return init_declarator();
+}
+
+// (6.7)
+node_t *init_declarator() {
+    node_t *decl = declarator();
+    if (!decl) return NULL;
+
+    node_t *init_decl = new_node_with(ND_INIT_DECLARATOR, decl, NULL);
+
+    if (consume("=")) {
+        node_t *init = initializer();
+        init_decl->rhs = init;
+        return init_decl;
+    } else {
+        return init_decl;
+    }
+}
+
+extern const char *types[];
+extern const unsigned int types_len;
+
+// (6.7.2)
+node_t *type_specifier() {
+    char *type_spec_maybe = peek_types(types, types_len);
+    if (type_spec_maybe) {
+        node_t *type_spec = new_node(ND_TYPE_SPECIFIER);
+        type_spec->str = cur->str;
+        type_spec->len = cur->len;
+        cur = cur->next;
+        return type_spec;
+    } else {
+        return NULL;
+    }
+}
+
+// (6.7.3)
+node_t *type_qualifier() {
+    if (consume("const")) {
+        node_t *tq = new_node(ND_TYPE_QUALIFIER);
+        tq->str = cur->str;
+        tq->len = cur->len;
+        return tq;
+    }
+
+    return NULL;
+}
+
+// (6.7.6)
+node_t *declarator() {
+    node_t *ptr_opt = pointer();
+    node_t *direct_decl = direct_declarator();
+
+    if (direct_decl) {
+        node_t *decl = new_node(ND_DECLARATOR);
+        decl->share.declarator.ptr_opt = ptr_opt;
+        decl->share.declarator.direct_decl = direct_decl;
+        return decl;
+    } else {
+        printf("declarator(): expected 'direct_declarator'\n");
+        exit(1);
+    }
+}
+
+// (6.7.6)
+node_t *direct_declarator() {
+    node_t *direct_decl = new_node(ND_DIRECT_DECLARATOR);
+
+    node_t *ident = identifier();
+    if (ident) {
+        direct_decl->share.direct_declarator.ident = ident;   
+    } else {
+        expect("(");
+        node_t *braced_declarator = declarator();
+        if (!braced_declarator) {
+        printf("expected declarator\n");
+            exit(1);
+        }
+        expect(")");
+        direct_decl->share.direct_declarator.braced_declarator = braced_declarator;
+    }
+
+    array_t *arr = (array_t *)calloc(1, sizeof(array_t));
+    array_t *head = arr;
+
+    for (int i = 0; ; i++) {
+        if (consume("[")) {
+            expect("]");
+            array_t *new_arr = (array_t *)calloc(1, sizeof(array_t));
+            new_arr->len = 46;
+            arr->next = new_arr;
+            arr = new_arr;
+            continue;
+        } else if (consume("(")) {
+            expect(")");
+            continue;
+        }
+
+        break;
+    }
+
+    direct_decl->share.direct_declarator.array = head->next;
+
+    return direct_decl;
+}
+
+// (6.7.6)
+node_t *pointer() {
+    node_t *ptrs = new_node(ND_POINTER);
+    node_t *head = ptrs;
+
+    while (1) {
+        if (consume("*")) {
+            node_t *tqs_opt = type_qualifier_list();
+            node_t *ptr = new_node(ND_POINTER);
+            ptr->share.pointer.tqs_opt = tqs_opt;
+            ptrs->share.pointer.ptr_opt = ptr;
+            ptrs = ptr;
+            continue;
+        }
+
+        break;
+    }
+
+    return head->share.pointer.ptr_opt;
+}
+
+// (6.7.6)
+node_t *type_qualifier_list() {
+    node_t *tqs = new_node(ND_TYPE_QUALIFIER);
+    node_t *head = tqs;
+
+    while (1) {
+        node_t *tq = type_qualifier();
+        if (tq) {
+            tqs->next = tq;
+            tqs = tq;
+            continue;
+        }
+
+        break;
+    }
+
+    return head->next;
+}
+
+// (6.7.9)
+node_t *initializer() {
+    // tmp
+    return expression();
 }
 
 bool consume(char *op) {
@@ -315,10 +426,20 @@ void expect(char *op) {
     exit(1);
 }
 
-bool type(char *name) {
+char *peek_types(char *names[], int len) {
+    for (int i = 0; i < len; i++) {
+        // printf("compare '%s' to '%.*s'\n", names[i], cur->len, cur->str);
+        if (peek_type(names[i])) {
+            return names[i];
+        }
+    }
+
+    return NULL;
+}
+
+bool peek_type(char *name) {
     if (cur->kind == TK_TYPE) {
-        if (cur->len == strlen(name) && strncmp(cur->str, name, cur->len) == 0) {
-            cur = cur->next;
+        if (cur->len == strlen(name) && strncmp(cur->str, name, cur->len) == 0) {   
             return true;
         }
     }
@@ -326,11 +447,31 @@ bool type(char *name) {
     return false;
 }
 
-node_t *new_node(node_kind_t kind, node_t *lhs, node_t *rhs) {
+node_t *new_node_with(node_kind_t kind, node_t *lhs, node_t *rhs) {
     node_t *node = (node_t *)calloc(1, sizeof(node_t));
     node->kind = kind;
     node->lhs = lhs;
     node->rhs = rhs;
 
     return node;
+}
+
+node_t *new_node(node_kind_t kind) {
+    node_t *node = (node_t *)calloc(1, sizeof(node_t));
+    node->kind = kind; 
+
+    return node;
+}
+
+// パースが失敗してもトークンを消費しないパーサにtryは必要ない
+node_t *try_(node_t *(*p)()) {
+    backtrack = cur;
+    node_t *res = p();
+    if (res) {
+        return res;
+    } else {
+        printf("try fial\n");
+        cur = backtrack;
+        return NULL;
+    }
 }

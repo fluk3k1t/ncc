@@ -8,6 +8,9 @@
 #include <ctype.h>
 #include <stdbool.h>
 
+extern const char *types[];
+extern const unsigned int types_len;
+
 typedef enum {
     TK_NUM, 
     TK_RESERVED, 
