@@ -13,6 +13,8 @@
         exit(1);                                                            \
     } while (0)
 
+// #define MUST(p) 
+
 typedef enum {
     ND_ADD,
     ND_SUB,
@@ -57,6 +59,8 @@ typedef enum {
     // top: identifier -> lhs, direct_declarator(rec) -> array
     ND_INIT_DECLARATOR,
     // declarator -> lhs, init(opt) -> rhs
+    ND_FUNCTION_DEFINITION,
+    ND_PARAMETER_DECLARATION,
 } node_kind_t;
 
 typedef struct array_t array_t;
@@ -66,6 +70,10 @@ struct array_t {
 };
 
 typedef struct node_t node_t;
+typedef struct node_list_t node_list_t;
+typedef struct decl_t decl_t;
+typedef struct decl_list_t decl_list_t;
+
 struct node_t {
     node_t *next;
     node_kind_t kind;
@@ -75,8 +83,12 @@ struct node_t {
 
     union {
         struct {
-            node_t *decl_specs, *init_decl_list_opt;
+            decl_list_t *decls;
         } declaration;
+
+        struct {
+            decl_t *decl;
+        } function_difinition;
 
         struct {
             node_t *ptr_opt, *direct_decl;
@@ -93,6 +105,11 @@ struct node_t {
     } share;
 };
 
+struct node_list_t {
+    node_t *self;
+    node_list_t *next;
+};
+
 typedef enum type_kind_t type_kind_t;
 enum type_kind_t {
     VOID, CHAR, SHORT, INT, LONG, STRUCT, PTR, ARRAY, FUN
@@ -102,23 +119,29 @@ enum type_kind_t {
 typedef struct type_t type_t;
 struct type_t {
     type_kind_t kind;
-    type_t *ptr_to, *ret, *param, *array_to;
+    type_t *ptr_to, *ret, *array_to;
+    decl_list_t *params;
     char *name;
     int len;
 };
 
-typedef struct decl_t decl_t;
 struct decl_t {
     type_t *decl;
-    char *ident;
+    node_t *ident, *init;
 };
 
-type_t *_declaration();
+struct decl_list_t {
+    decl_t *self;
+    decl_list_t *next;
+};
+
+node_t *_declaration();
 decl_t *_declarator(type_t *base);
 type_t *_pointer(type_t *base);
 decl_t *_direct_declarator();
 type_t *_type_specifier();
 type_t *_declaration_specifiers();
+decl_list_t *_init_declarator_list(type_t *base);
 decl_t *_init_declarator(type_t *base);
 
 node_t *parse(token_t *token);
@@ -128,17 +151,11 @@ node_t *primary_expression();
 node_t *multiplicative_expression();
 node_t *additive_expression();
 node_t *expression();
-node_t *declaration();
-node_t *declaration_specifiers();
-node_t *init_declarator_list();
-node_t *init_declarator();
-node_t *type_specifier();
-node_t *type_qualifier();
-node_t *declarator();
-node_t *direct_declarator(); 
-node_t *pointer();
-node_t *type_qualifier_list();
 node_t *initializer();
+decl_list_t *_parameter_list();
+decl_t *_parameter_declaration();
+decl_t *_abstract_declarator(type_t *base);
+decl_t *_direct_abstract_declarator(type_t *base);
 
 void show_node(node_t *node);
 void show_node_with_indent(node_t *node, int level);
@@ -152,6 +169,8 @@ void expect(char *op);
 bool peek_type(char *name);
 char *peek_types(char *names[], int len);
 node_t *try_(node_t *(*p)());
+void *must(void *(*p)(), char *p_name);
 type_t *new_type(type_kind_t kind);
+
 
 #endif
