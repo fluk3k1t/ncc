@@ -4,6 +4,14 @@
 #include <tokenizer.h>
 
 #define LIST_MAX 256
+#define PANIC(fmt, ...)                                                     \
+    do {                                                                    \
+        fprintf(stderr,                                                     \
+                "PANIC at %s:%d in %s(): " fmt "\n",                        \
+                __FILE__, __LINE__, __func__, ##__VA_ARGS__);               \
+        fflush(stderr);                                                     \
+        exit(1);                                                            \
+    } while (0)
 
 typedef enum {
     ND_ADD,
@@ -85,14 +93,33 @@ struct node_t {
     } share;
 };
 
-typedef enum specifier_t specifier_t;
-enum specifier_t {
-    STORAGE_CLASS_SPECIFIER,
-    TYPE_SPECIFIER,
-    TYPE_QUALIFIER,
-    FUNCTION_SPECIFIER,
-    ALIGNMENT_SPECIFIER,
+typedef enum type_kind_t type_kind_t;
+enum type_kind_t {
+    VOID, CHAR, SHORT, INT, LONG, STRUCT, PTR, ARRAY, FUN
 };
+
+
+typedef struct type_t type_t;
+struct type_t {
+    type_kind_t kind;
+    type_t *ptr_to, *ret, *param, *array_to;
+    char *name;
+    int len;
+};
+
+typedef struct decl_t decl_t;
+struct decl_t {
+    type_t *decl;
+    char *ident;
+};
+
+type_t *_declaration();
+decl_t *_declarator(type_t *base);
+type_t *_pointer(type_t *base);
+decl_t *_direct_declarator();
+type_t *_type_specifier();
+type_t *_declaration_specifiers();
+decl_t *_init_declarator(type_t *base);
 
 node_t *parse(token_t *token);
 node_t *identifier();
@@ -116,6 +143,7 @@ node_t *initializer();
 void show_node(node_t *node);
 void show_node_with_indent(node_t *node, int level);
 void show_array_with_indent(array_t *array, int level);
+void show_type(type_t *type);
 node_t *new_node(node_kind_t kind);
 node_t *new_node_with(node_kind_t kind, node_t *lhs, node_t *rhs);
 bool consume(char *op);
@@ -124,5 +152,6 @@ void expect(char *op);
 bool peek_type(char *name);
 char *peek_types(char *names[], int len);
 node_t *try_(node_t *(*p)());
+type_t *new_type(type_kind_t kind);
 
 #endif

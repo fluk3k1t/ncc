@@ -21,6 +21,7 @@
         "variant": "c",
         "chrono": "cpp",
         "typeinfo": "cpp",
-        "cstdlib": "c"
+        "cstdlib": "c",
+        "parser.h": "c"
     }
 }

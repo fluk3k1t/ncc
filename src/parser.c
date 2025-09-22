@@ -109,6 +109,37 @@ void show_node_with_indent(node_t *node, int level) {
     }
 }
 
+void show_type(type_t *t) {
+    if (!t) {
+        printf("show_type: NULL\n");
+        exit(1);
+    }
+
+    switch (t->kind) {
+        case VOID:
+            printf("VOID\n");
+            break;
+        case INT:
+            printf("INT\n");
+            break;
+        case PTR:
+            printf("PTR\n");
+            show_type(t->ptr_to);
+            break;
+        case ARRAY:
+            printf("ARRAY\n");
+            show_type(t->array_to);
+            break;
+        case FUN:
+            printf("FUN\n");
+            show_type(t->ret);
+            break;
+        default:
+            printf("default\n");
+            break;
+    }
+}
+
 void show_array_with_indent(array_t *array, int level) {
     put_indent(level); printf("[%d]\n", array->len);
     if (array->next) {
@@ -119,7 +150,7 @@ void show_array_with_indent(array_t *array, int level) {
 node_t *parse(token_t *token) {
     cur = token;
 
-    node_t *e = declaration();
+    type_t *e = _declaration();
     
     return e;
 }
@@ -201,23 +232,128 @@ node_t *expression() {
     node_t *e = additive_expression();
 }
 
-// A.2.2 Declarations
-// (6.7)
-node_t *declaration() {
-    token_t *_backtrack = cur;
+type_t *_declaration() {
+    type_t *decl_specs = _declaration_specifiers();
+    decl_t *init_dectr = _init_declarator(decl_specs);
 
-    node_t *decl_specs = declaration_specifiers();
-    if (!decl_specs) return NULL;
+    // return init_dectr;
+    show_type(init_dectr->decl);
 
-    // optional !!
-    node_t *init_decl_list_opt = init_declarator_list();
+    return NULL;
+}
 
-    expect(";");
-    
-    node_t *decl = new_node(ND_DECLARATION);
-    decl->share.declaration.decl_specs = decl_specs;
-    decl->share.declaration.init_decl_list_opt = init_decl_list_opt;
-    return decl;
+type_t *_declaration_specifiers() {
+
+    while (1) {
+        type_t *tspec = _type_specifier();
+        if (tspec) {
+            return tspec;
+        }
+
+        break;
+    }
+
+    return NULL;
+}
+
+decl_t *_init_declarator(type_t *base) {
+    decl_t *dectr = _declarator(base);
+    return dectr;
+}
+
+type_t *_type_specifier() {
+    if (strncmp(cur->str, "int", 3) == 0) {
+        type_t *t = (type_t *)calloc(1, sizeof(type_t));
+        t->kind = INT;
+        cur = cur->next;
+        return t;
+    }
+
+    return NULL;
+}
+
+decl_t *_declarator(type_t *base) {
+    type_t *ptr_opt = _pointer(base);
+    decl_t *direct_decl = _direct_declarator(ptr_opt);
+
+    return direct_decl;
+}
+
+decl_t *_direct_declarator(type_t *base) {
+    type_t *braced = NULL;
+
+    node_t *ident = identifier();
+
+    if (!ident) {
+        if (consume("(")) {
+            braced = _declarator(NULL)->decl;
+            expect(")");
+        } else {
+            PANIC("unimplemented\n");
+        }
+    }
+
+    while (1) {
+        if (consume("[")) {
+            expect("]");
+            type_t *arr = new_type(ARRAY);
+            arr->array_to = base;
+            base = arr;
+        } else if (consume("(")) {
+            expect(")");
+            type_t *fn = new_type(FUN);
+            fn->ret = base;
+            base = fn;
+        } else {
+            break;
+        }
+    }
+
+    if (braced) {
+        type_t *tail = braced;
+        while (1) {
+            if (tail->ptr_to || tail->array_to) {
+                if (tail->kind == PTR) {
+                    tail = tail->ptr_to;
+                } else if (tail->kind == ARRAY) {
+                    tail = tail->array_to;
+                } else {
+                    PANIC("unreachable");
+                }
+            } else {
+                break;
+            }
+        }
+
+        if (tail->kind == PTR) {
+            tail->ptr_to = base;
+        } else if (tail->kind == ARRAY) {
+            tail->array_to = base;
+        } else {
+            PANIC("unreachable");
+        }
+
+        base = braced;
+    }
+
+    // decl_tはただのtype_tとidentのタプルなので動的確保しなくてもいいが混在するとややこしいので、、、
+    decl_t *d = (decl_t *)calloc(1, sizeof(decl_t));
+    d->decl = base;
+    d->ident = ident;
+
+    return d;
+}
+
+type_t *_pointer(type_t *base) {
+    type_t *head = base;
+
+    while (consume("*")) {
+        type_t *ptr = new_type(PTR);
+        ptr->ptr_to = base;
+        base = ptr;
+    }
+
+    return base;
 }
 
 // (6.7)
@@ -474,4 +610,11 @@ node_t *try_(node_t *(*p)()) {
         cur = backtrack;
         return NULL;
     }
+}
+
+type_t *new_type(type_kind_t kind) {
+    type_t *type = (type_t *)calloc(1, sizeof(type_t));
+    type->kind = kind;
+
+    return type;
 }
