@@ -3,7 +3,7 @@
 #include "../inc/parser.h"
 
 int main(int argc, char *argv[]) {
-    char *code = "int a = (b)1)";
+    char *code = "short a (){}";
     
     token_t *token = tokenize(code);
     // show_token(token);

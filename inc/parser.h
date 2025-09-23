@@ -8,7 +8,7 @@
     do {                                                                    \
         fprintf(stderr,                                                     \
                 "PANIC at %s:%d in %s(): " fmt " rest: %.*s\n",             \
-                __FILE__, __LINE__, __func__, ##__VA_ARGS__, cur->len, cur->str);\
+                __FILE__, __LINE__, __func__, ##__VA_ARGS__, _cur->len, _cur->str);\
         fflush(stderr);                                                     \
         exit(1);                                                            \
     } while (0)
@@ -18,7 +18,7 @@
         if (!consume(expected)) {                                           \
             fprintf(stderr,                                                 \
                     "EXPECTED '%s' but '%.*s' at %s:%d in %s(): \n",        \
-                    expected, cur->len, cur->str, __FILE__, __LINE__, __func__); \
+                    expected, _cur->len, _cur->str, __FILE__, __LINE__, __func__); \
             fflush(stderr);                                                 \
             exit(1);                                                        \  
         }                                                                   \
@@ -33,10 +33,10 @@
 
 #define TRY(expr) \
     ({                                                          \
-        token_t *_t = cur;                                      \
+        token_t *_t = _cur;                                      \
         __auto_type _v = (expr);                                \
         if (!_v) {                                              \
-            if (_t != cur) PANIC("token not recoverd!\n");      \
+            if (_t != _cur) PANIC("token not recoverd!\n");      \
             return NULL;                                        \
         }                                                       \
         _v;                                                     \
@@ -92,6 +92,7 @@ typedef enum {
     ND_COMPOUND_STATEMENT,
     ND_EXPRESSION_STATEMENT,
     ND_ASSIGNMENT_EXPRESSION,
+    ND_ILLEGAL,
 } node_kind_t;
 
 typedef struct array_t array_t;
@@ -132,6 +133,7 @@ struct node_t {
 
         struct {
             decl_t *decl;
+            node_t *cs;
         } function_difinition;
 
         struct {
@@ -181,13 +183,15 @@ struct decl_list_t {
 node_t *_declaration();
 decl_t *_declarator(type_t *base);
 type_t *_pointer(type_t *base);
-decl_t *_direct_declarator();
+decl_t *_direct_declarator(type_t *base);
 type_t *_type_specifier();
 type_t *_declaration_specifiers();
 decl_list_t *_init_declarator_list(type_t *base);
 decl_t *_init_declarator(type_t *base);
 
 node_t *parse(token_t *token);
+node_t *_external_declaration();
+node_t *_function_definition();
 node_t *identifier();
 node_t *constant();
 node_t *primary_expression();
@@ -216,6 +220,7 @@ node_t *new_node_with(node_kind_t kind, node_t *lhs, node_t *rhs);
 char *oneof(char **ones, int len);
 bool consume(char *op);
 bool peek(char *op);
+bool type(char *c);
 void expect(char *op);
 bool peek_type(char *name);
 char *peek_types(char *names[], int len);

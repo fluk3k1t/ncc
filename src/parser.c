@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include "../inc/tokenizer.h"
 
-static token_t *cur = NULL;
+static token_t *_cur = NULL;
 static token_t *backtrack = NULL;
 
 void put_indent(int level) {
@@ -55,6 +55,11 @@ void show_node_with_indent(node_t *node, int level) {
         //         show_node_with_indent(node->next, level);
         //     }
         //     break;
+        case ND_FUNCTION_DEFINITION: 
+            put_indent(level); printf("ND_FUNCTION_DEFINITION: \n");
+            put_indent(level + 1); show_type(node->share.function_difinition.decl->decl); printf("\n");
+            show_node_with_indent(node->share.function_difinition.cs, level + 1);
+            break;
         case ND_DECLARATION:
             put_indent(level); printf("ND_DECLARATION: \n");
             for (decl_list_t *cur = node->share.declaration.decls; cur; cur = cur->next) {
@@ -64,8 +69,24 @@ void show_node_with_indent(node_t *node, int level) {
                     PANIC("EXPECTed ident\n");
                 }
                 show_type(cur->self->decl);
+                if (cur->self->init) {
+                    put_indent(level + 1); printf("init: \n");
+                    show_node_with_indent(cur->self->init, level + 2);
+                }
                 printf("\n");
             }
+            break;
+        case ND_COMPOUND_STATEMENT:
+            put_indent(level); printf("ND_COMPOUND_STATEMENT: \n");
+            for (node_list_t *cur = node->share.compound_statement.block_item_list_opt; cur; cur = cur->next) {
+                show_node_with_indent(cur->self, level + 1);
+            }
+            break;
+        case ND_ASSIGNMENT_EXPRESSION:
+            put_indent(level); printf("ND_ASSIGNMENT_EXPRESSION: \n");
+            show_node_with_indent(node->share.assignment_expression.unary_expression, level + 1);
+            put_indent(level + 1); printf("op: %s\n", node->share.assignment_expression.assignment_operator);
+            show_node_with_indent(node->share.assignment_expression.rec, level + 1);
             break;
         // case ND_DECLARATOR:
         //     put_indent(level); printf("ND_DECLARATOR: \n");
@@ -162,20 +183,91 @@ void show_array_with_indent(array_t *array, int level) {
 }
 
 node_t *parse(token_t *token) {
-    cur = token;
+    _cur = token;
 
-    type_t *e = _declaration();
+    node_t *exd = _external_declaration();
     
-    return e;
+    return exd;
+}
+
+void consume_brace() {
+    EXPECT("(");
+
+    while (_cur) {
+        if (!_cur) PANIC("expected )");
+        
+        if (consume(")")) return; 
+
+        if (peek("(")) consume_brace();
+        else _cur = _cur->next;
+    }
+}
+
+node_kind_t classify_external_declaration() {
+    token_t *_reserved_cur = _cur;
+
+    while (!peek("(")) {
+        if (peek(";")) {
+            printf("classyfi declaration\n");
+            _cur = _reserved_cur;
+            return ND_DECLARATION;
+        }
+        _cur = _cur->next;
+        if (!_cur) PANIC("expected '('");
+    }
+
+    consume_brace();
+
+    if (!_cur) PANIC("expected ')'");
+
+    node_kind_t res = ND_ILLEGAL;
+
+    if (strncmp(_cur->str, "{", 1) == 0) {
+        res = ND_FUNCTION_DEFINITION;
+        printf("classify function definition\n");
+    } else if (strncmp(_cur->str, ";", 1) == 0) {
+        res = ND_DECLARATION;
+        printf("classify declaration\n");
+    } else {
+        PANIC("expected ';' or '{'\n");
+    }
+
+    _cur = _reserved_cur;
+    return res;
+}
+
+node_t *_external_declaration() {
+    switch (classify_external_declaration()) {
+        case ND_FUNCTION_DEFINITION:    return _function_definition();
+        case ND_DECLARATION:            return _declaration();
+        default:                        PANIC("unreachable!\n");
+    }
+}
+
+node_t *_function_definition() {
+    type_t *tspecs = _declaration_specifiers();
+    if (!tspecs) PANIC("toplevel");
+
+    decl_t *decl = _declarator(tspecs);
+    if (!decl) { PANIC("EXPECTed '_declarator()'\n"); }
+
+    node_t *cs = _compound_statement();
+    if (!cs) PANIC("expected compound statement\n");
+
+    node_t *fd = new_node(ND_FUNCTION_DEFINITION);
+    fd->share.function_difinition.decl = decl;
+    fd->share.function_difinition.cs = cs;
+
+    return fd;
 }
 
 node_t *identifier() {
-    if (cur->kind == TK_IDENT) {
+    if (_cur->kind == TK_IDENT) {
         node_t *ident = new_node(ND_IDENT);
-        ident->str = cur->str;
-        ident->len = cur->len;
+        ident->str = _cur->str;
+        ident->len = _cur->len;
 
-        cur = cur->next;
+        _cur = _cur->next;
         return ident;
     } else {
         return NULL;
@@ -183,16 +275,16 @@ node_t *identifier() {
 }
 
 node_t *constant() {
-    if (cur->kind != TK_NUM) {
+    if (_cur->kind != TK_NUM) {
         printf("constant(): EXPECT number but\n");
         exit(1);
     }
 
     node_t *node = (node_t *)calloc(1, sizeof(node_t));
     node->kind = ND_NUM;
-    node->val = cur->val;
+    node->val = _cur->val;
     
-    cur = cur->next;
+    _cur = _cur->next;
 
     return node;
 }
@@ -201,14 +293,14 @@ node_t *primary_expression() {
     node_t *ident = identifier();
     if (ident) return ident;
 
-    if (cur->kind == TK_NUM) {
+    if (_cur->kind == TK_NUM) {
         return constant();
     } else if (consume("(")) {
         node_t *e = expression();
         EXPECT(")");
         return e;
     } else {
-        PANIC("primary_expression: unimplemented! %s\n", cur->str);
+        PANIC("primary_expression: unimplemented! %s\n", _cur->str);
     }
 }
 
@@ -249,12 +341,12 @@ node_t *_assignment_expression() {
     node_t *exp = additive_expression();
     if (!exp) return NULL;
 
-    /// TODO: assignment_expressionがただのexpressionを返してしまっていいのか
+    // TODO: assignment_expressionがただのexpressionを返してしまっていいのか
     char *aop = _assignment_operator();
     if (!aop) return exp;
 
     node_t *aexp_rec = _assignment_expression();
-    if (!aexp_rec) { PANIC("EXPECTed assignment expression \n"); }
+    if (!aexp_rec) { PANIC("expected assignment expression \n"); }
 
     node_t *aexp = new_node(ND_ASSIGNMENT_EXPRESSION);
     aexp->share.assignment_expression.unary_expression = exp;
@@ -282,6 +374,8 @@ node_t *_declaration() {
 
     decl_list_t *init_dectr_list = _init_declarator_list(decl_specs);
     if (!init_dectr_list) { PANIC("EXPECTed '_init_declarator_list'\n"); }
+
+    expect(";");
 
     node_t *decl = new_node(ND_DECLARATION);
     decl->share.declaration.decls = init_dectr_list;
@@ -332,24 +426,45 @@ decl_t *_init_declarator(type_t *base) {
 }
 
 type_t *_type_specifier() {
-    if (strncmp(cur->str, "int", 3) == 0) {
-        type_t *t = (type_t *)calloc(1, sizeof(type_t));
-        t->kind = INT;
-        cur = cur->next;
-        return t;
+    type_t *t = (type_t *)calloc(1, sizeof(type_t));
+
+    if (type("void")) {
+        t->kind = VOID;
+    } else if (type("char")) {
+        t->kind = CHAR;
+    } else if (type("short")) {
+        t->kind = SHORT;  
+    } else if (type("int")) {
+        t->kind = INT;  
+    } else if (type("long")) {
+        t->kind = LONG;  
+    } else if (type("float")) {
+        PANIC("todo!()\n");
+        // t->kind = FLOAT;  
+    } else if (type("double")) {
+        PANIC("todo!()\n");
+        // t->kind = DOUBLE;  
+    } else if (type("signed")) {
+        PANIC("todo!()\n");
+        // t->kind = SHORT;  
+    } else if (type("unsigned")) {
+        PANIC("todo!()\n");
+        // t->kind = SHORT;  
+    } else {
+        return NULL;
     }
 
-    return NULL;
+    return t;
 }
 
 decl_t *_declarator(type_t *base) {
-    token_t *backtrack = cur;
+    token_t *backtrack = _cur;
 
     type_t *ptr_opt = _pointer(base);
     decl_t *direct_decl = _direct_declarator(ptr_opt);
 
     if (!direct_decl) {
-        cur = backtrack;
+        _cur = backtrack;
         return NULL;
     }
 
@@ -469,7 +584,11 @@ decl_t *_abstract_declarator(type_t *base) {
     if (!ptr) {
         if (!direct_abst_dectr) { PANIC("EXPECTed direct-abstract-declarator()"); }
     } else {
-        if (!direct_abst_dectr) return ptr;
+        if (!direct_abst_dectr) { 
+            decl_t *ptr_decl = (decl_t *)calloc(1, sizeof(decl_t));
+            ptr_decl->decl = ptr;
+            return ptr_decl;
+        }
     }
 
     return direct_abst_dectr;
@@ -562,22 +681,25 @@ node_t *initializer() {
     return _assignment_expression();
 }
 
-node_t *_function_difinition() {
-    type_t *tspecs = _declaration_specifiers();
-    if (!tspecs) return NULL;
+// node_t *_function_difinition() {
+//     type_t *tspecs = _declaration_specifiers();
+//     if (!tspecs) return NULL;
 
-    decl_t *dectr = _declarator(tspecs);
-    if (!dectr) { PANIC("EXPECTed '_declarator()'\n"); }
+//     decl_t *dectr = _declarator(tspecs);
+//     if (!dectr) { PANIC("EXPECTed '_declarator()'\n"); }
 
-    node_t *fd = new_node(ND_FUNCTION_DEFINITION);
-    fd->share.function_difinition.decl = dectr;
+//     node_t *fd = new_node(ND_FUNCTION_DEFINITION);
+//     fd->share.function_difinition.decl = dectr;
 
-    return fd;
-}
+//     return fd;
+// }
 
 node_t *_statement() {
     node_t *cs = _compound_statement();
     if (cs) return cs;
+
+    // TODO: この依存をなくすにはバックトラックが必要
+    if (peek("}")) return NULL;
 
     node_t *es = _expression_statement();
     if (es) return es;
@@ -588,9 +710,10 @@ node_t *_statement() {
 node_t *_compound_statement() {
     if (consume("{")) {
         node_list_t *bs = _block_item_list();
+        EXPECT("}");
         node_t *cps = new_node(ND_COMPOUND_STATEMENT);
         cps->share.compound_statement.block_item_list_opt = bs;
-        EXPECT("}");
+        return cps;
     } else {
         return NULL;
     }
@@ -621,7 +744,8 @@ node_t *_block_item() {
     node_t *stmt = _statement();
     if (stmt) return stmt;
 
-    PANIC("EXPECTed declaration or statement\n");
+    // 空{}用
+    return NULL;
 }
 
 // expressionがNULLの場合でも';'を必須とするので呼び出し側での優先順位は最下位
@@ -646,11 +770,13 @@ char *oneof(char **ones, int len) {
 } 
 
 bool consume(char *op) {
-    if (cur->kind == TK_RESERVED || cur->kind == TK_IDENT) {
-        printf("compare %s to %.*s\n", op, cur->len, cur->str);
-        if (cur->len == strlen(op) && strncmp(cur->str, op, cur->len) == 0) {
-            printf("match\n");
-            cur = cur->next;
+    if (!_cur) PANIC("current token is null\n");
+
+    if (_cur->kind == TK_RESERVED || _cur->kind == TK_IDENT) {
+        // printf("compare %s to %.*s\n", op, _cur->len, _cur->str);
+        if (_cur->len == strlen(op) && strncmp(_cur->str, op, _cur->len) == 0) {
+            // printf("match\n");
+            _cur = _cur->next;
             return true;
         }
     }
@@ -659,8 +785,25 @@ bool consume(char *op) {
 }
 
 bool peek(char *op) {
-    if (cur->kind == TK_RESERVED || cur->kind == TK_IDENT) {
-        if (cur->len == strlen(op) && strncmp(cur->str, op, cur->len) == 0) {
+    if (!_cur) PANIC("current token is null\n");
+
+    if (_cur->kind == TK_RESERVED || _cur->kind == TK_IDENT) {
+        if (_cur->len == strlen(op) && strncmp(_cur->str, op, _cur->len) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool type(char *c) {
+    if (!_cur) PANIC("current token is null\n");
+
+    // printf("compare %s to %s\n", c, _cur->str);
+
+    if (_cur->kind == TK_TYPE) {
+        if (_cur->len == strlen(c) && strncmp(_cur->str, c, _cur->len) == 0) {
+            _cur = _cur->next;
             return true;
         }
     }
@@ -669,14 +812,14 @@ bool peek(char *op) {
 }
 
 void expect(char *op) {
-    if (cur->kind == TK_RESERVED || cur->kind == TK_IDENT) {
-        if (cur->len == strlen(op) && strncmp(cur->str, op, cur->len) == 0) {
-            cur = cur->next;
+    if (_cur->kind == TK_RESERVED || _cur->kind == TK_IDENT) {
+        if (_cur->len == strlen(op) && strncmp(_cur->str, op, _cur->len) == 0) {
+            _cur = _cur->next;
             return;
         }
     }
 
-    printf("EXPECT '%s' but '%.*s'\n", op, cur->len, cur->str);
+    printf("EXPECT '%s' but '%.*s'\n", op, _cur->len, _cur->str);
     exit(1);
 }
 
@@ -692,8 +835,8 @@ char *peek_types(char *names[], int len) {
 }
 
 bool peek_type(char *name) {
-    if (cur->kind == TK_TYPE) {
-        if (cur->len == strlen(name) && strncmp(cur->str, name, cur->len) == 0) {   
+    if (_cur->kind == TK_TYPE) {
+        if (_cur->len == strlen(name) && strncmp(_cur->str, name, _cur->len) == 0) {   
             return true;
         }
     }
@@ -719,13 +862,13 @@ node_t *new_node(node_kind_t kind) {
 
 // パースが失敗してもトークンを消費しないパーサにtryは必要ない
 node_t *try_(node_t *(*p)()) {
-    backtrack = cur;
+    backtrack = _cur;
     node_t *res = p();
     if (res) {
         return res;
     } else {
         printf("try fial\n");
-        cur = backtrack;
+        _cur = backtrack;
         return NULL;
     }
 }
