@@ -1,16 +1,27 @@
 #ifndef __H_PARSER_
 #define __H_PARSER_
 
-#include <tokenizer.h>
+#include "tokenizer.h"
 
 #define LIST_MAX 256
 #define PANIC(fmt, ...)                                                     \
     do {                                                                    \
         fprintf(stderr,                                                     \
-                "PANIC at %s:%d in %s(): " fmt "\n",                        \
-                __FILE__, __LINE__, __func__, ##__VA_ARGS__);               \
+                "PANIC at %s:%d in %s(): " fmt " rest: %.*s\n",             \
+                __FILE__, __LINE__, __func__, ##__VA_ARGS__, cur->len, cur->str);\
         fflush(stderr);                                                     \
         exit(1);                                                            \
+    } while (0)
+
+#define EXPECT(expected)                                                    \
+    do {                                                                    \
+        if (!consume(expected)) {                                           \
+            fprintf(stderr,                                                 \
+                    "EXPECTED '%s' but '%.*s' at %s:%d in %s(): \n",        \
+                    expected, cur->len, cur->str, __FILE__, __LINE__, __func__); \
+            fflush(stderr);                                                 \
+            exit(1);                                                        \  
+        }                                                                   \
     } while (0)
 
 #define MUST(p)                                                             \
@@ -79,6 +90,8 @@ typedef enum {
     ND_PARAMETER_DECLARATION,
     ND_BLOCK_ITEM_LIST,
     ND_COMPOUND_STATEMENT,
+    ND_EXPRESSION_STATEMENT,
+    ND_ASSIGNMENT_EXPRESSION,
 } node_kind_t;
 
 typedef struct array_t array_t;
@@ -103,6 +116,15 @@ struct node_t {
         struct {
             node_list_t *block_item_list_opt;
         } compound_statement;
+
+        struct {
+            node_t *expression_opt;
+        } expression_statement;
+
+        struct {
+            node_t *unary_expression, *rec;
+            char *assignment_operator;
+        } assignment_expression;
 
         struct {
             decl_list_t *decls;
@@ -132,10 +154,9 @@ struct node_list_t {
     node_list_t *next;
 };
 
-typedef enum type_kind_t type_kind_t;
-enum type_kind_t {
+typedef enum {
     VOID, CHAR, SHORT, INT, LONG, STRUCT, PTR, ARRAY, FUN
-};
+} type_kind_t;
 
 
 typedef struct type_t type_t;
@@ -172,12 +193,15 @@ node_t *constant();
 node_t *primary_expression();
 node_t *multiplicative_expression();
 node_t *additive_expression();
+node_t *_assignment_expression();
+char *_assignment_operator();
 node_t *expression();
 node_t *initializer();
 node_t *_statement();
 node_t *_compound_statement();
 node_list_t *_block_item_list();
 node_t *_block_item();
+node_t *_expression_statement();
 decl_list_t *_parameter_list();
 decl_t *_parameter_declaration();
 decl_t *_abstract_declarator(type_t *base);
@@ -189,6 +213,7 @@ void show_array_with_indent(array_t *array, int level);
 void show_type(type_t *type);
 node_t *new_node(node_kind_t kind);
 node_t *new_node_with(node_kind_t kind, node_t *lhs, node_t *rhs);
+char *oneof(char **ones, int len);
 bool consume(char *op);
 bool peek(char *op);
 void expect(char *op);

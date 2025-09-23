@@ -1,4 +1,4 @@
-#include <tokenizer.h>
+#include "../inc/tokenizer.h"
 
 const char *puncts[] = {"==", "!=", "<=", ">=", "->", "<", ">", "+", "-", "*", "/", "(", ")", "=", ";", "{", "}", ",", "&", "[", "]", "."};
 const char *types[] = {"char", "short", "int", "long", "void", "struct", "typedef", "float", "unsigned"};

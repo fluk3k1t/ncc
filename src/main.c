@@ -1,9 +1,9 @@
 #include <stdio.h>
-#include <tokenizer.h>
-#include <parser.h>
+#include "../inc/tokenizer.h"
+#include "../inc/parser.h"
 
 int main(int argc, char *argv[]) {
-    char *code = "int f(int )";
+    char *code = "int a = (b)1)";
     
     token_t *token = tokenize(code);
     // show_token(token);
