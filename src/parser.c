@@ -313,8 +313,15 @@ type_t *_type_specifier() {
 }
 
 decl_t *_declarator(type_t *base) {
+    token_t *backtrack = cur;
+
     type_t *ptr_opt = _pointer(base);
     decl_t *direct_decl = _direct_declarator(ptr_opt);
+
+    if (!direct_decl) {
+        cur = backtrack;
+        return NULL;
+    }
 
     return direct_decl;
 }
@@ -332,7 +339,8 @@ decl_t *_direct_declarator(type_t *base) {
             ident = dectr->ident;
             expect(")");
         } else {
-            PANIC("unimplemented %s\n", cur->str);
+            // abstに委譲
+            return NULL;
         }
     }
 
@@ -394,43 +402,34 @@ decl_t *_direct_declarator(type_t *base) {
 }
 
 decl_list_t *_parameter_list() {
-    decl_list_t *cur = (decl_list_t *)calloc(1, sizeof(decl_list_t));
-    decl_list_t *head = cur;
+    decl_list_t *head = NULL;
+    decl_list_t **tail = &head;
 
     decl_t *p = _parameter_declaration();
     if (p) {
         do {
-            decl_list_t *next = (decl_list_t *)calloc(1, sizeof(decl_list_t));
-            next->self = p;
-            cur->next = next;
-            cur = next;
-        } while (consume(","));
+            decl_list_t *decl = (decl_list_t *)calloc(1, sizeof(decl_list_t));
+            decl->self = p;
+
+            *tail = decl;
+            tail = &decl->next;
+        } while (consume(",") && (p = _parameter_declaration()));
     }
 
-    return head->next;
+    return head;
 }
 
 decl_t *_parameter_declaration() {
     type_t *tspecs = _declaration_specifiers();
     if (!tspecs) return NULL;
 
+    decl_t *dectr = _declarator(tspecs);
+    if (dectr) return dectr;
+
     decl_t *abst_dectr = _abstract_declarator(tspecs);
     if (abst_dectr) return abst_dectr;
-
-    decl_t *dectr = _declarator(tspecs);
-    if (!dectr) { PANIC("expected declarator()"); }
-
-    return dectr;
-
-    // decl_t *dectr = _declarator(tspecs);
-    // if (dectr) return dectr;
-
-    // decl_t *abst_dectr = _abstract_declarator(tspecs);
-    // if (!abst_dectr) { PANIC("expected abstract-declarator()"); }
-
-    PANIC("panic");
-
-    // return abst_dectr;
+    
+    PANIC("expected abstract-declarator()");
 }
 
 decl_t *_abstract_declarator(type_t *base) {
@@ -462,8 +461,10 @@ decl_t *_direct_abstract_declarator(type_t *base) {
             arr->array_to = base;
             base = arr;
         } else if (consume("(")) {
+            type_t *ps = _parameter_list();
             expect(")");
             type_t *fn = new_type(FUN);
+            fn->params = ps;
             fn->ret = base;
             base = fn;
         } else {
@@ -510,26 +511,6 @@ decl_t *_direct_abstract_declarator(type_t *base) {
     return d;
 }
 
-// type_t *_direct_abstract_declarator_partial(type_t *base) {
-//     while (1) {
-//         if (consume("[")) {
-//             expect("]");
-//             type_t *arr = new_type(ARRAY);
-//             arr->array_to = base;
-//             base = arr;
-//         } else if (consume("(")) {
-//             expect(")");
-//             type_t *fn = new_type(FUN);
-//             fn->ret = base;
-//             base = fn;
-//         } else {
-//             break;
-//         }
-//     }
-
-//     return base;
-// }
-
 type_t *_pointer(type_t *base) {
     type_t *head = base;
 
@@ -555,13 +536,56 @@ node_t *_function_difinition() {
     type_t *tspecs = _declaration_specifiers();
     if (!tspecs) return NULL;
 
-    decl_t *dectr = _declarator(tspecs);
-    if (!dectr) { PANIC("expected '_declarator()'\n"); }
+    decl_t *dectr = MUST(_declarator(tspecs));
+    // if (!dectr) { PANIC("expected '_declarator()'\n"); }
 
     node_t *fd = new_node(ND_FUNCTION_DEFINITION);
     fd->share.function_difinition.decl = dectr;
 
     return fd;
+}
+
+node_t *_statement() {
+    return _compound_statement();
+}
+
+node_t *_compound_statement() {
+    if (consume("{")) {
+        node_list_t *bs = _block_item_list();
+        node_t *cps = new_node(ND_COMPOUND_STATEMENT);
+        cps->share.compound_statement.block_item_list_opt = bs;
+        expect("}");
+    } else {
+        return NULL;
+    }
+}
+
+node_list_t *_block_item_list() {
+    node_list_t *cur = (node_list_t *)calloc(1, sizeof(node_list_t));
+    node_list_t *head = cur;
+
+    while (1) {
+        node_t *item = _block_item();
+        if (!item) break;
+
+        node_list_t *next = (node_list_t *)calloc(1, sizeof(node_list_t));
+        next->self = item;
+
+        cur->next = next;
+        cur = next;
+    }
+
+    return head->next;
+}
+
+node_t *_block_item() {
+    node_t *decl = _declaration();
+    if (decl) return decl;
+
+    node_t *stmt = _statement();
+    if (stmt) return stmt;
+
+    PANIC("expected declaration or statement\n");
 }
 
 bool consume(char *op) {

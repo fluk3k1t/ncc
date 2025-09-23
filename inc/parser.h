@@ -13,7 +13,12 @@
         exit(1);                                                            \
     } while (0)
 
-// #define MUST(p) 
+#define MUST(p)                                                             \
+    ({                                                                      \
+        __auto_type _tmp = (p);                                             \
+        if (!_tmp) PANIC("expected " #p "\n");                           \
+        _tmp;                                                               \
+    })                                                                      
 
 typedef enum {
     ND_ADD,
@@ -61,6 +66,8 @@ typedef enum {
     // declarator -> lhs, init(opt) -> rhs
     ND_FUNCTION_DEFINITION,
     ND_PARAMETER_DECLARATION,
+    ND_BLOCK_ITEM_LIST,
+    ND_COMPOUND_STATEMENT,
 } node_kind_t;
 
 typedef struct array_t array_t;
@@ -82,6 +89,10 @@ struct node_t {
     int len, val;
 
     union {
+        struct {
+            node_list_t *block_item_list_opt;
+        } compound_statement;
+
         struct {
             decl_list_t *decls;
         } declaration;
@@ -152,6 +163,10 @@ node_t *multiplicative_expression();
 node_t *additive_expression();
 node_t *expression();
 node_t *initializer();
+node_t *_statement();
+node_t *_compound_statement();
+node_list_t *_block_item_list();
+node_t *_block_item();
 decl_list_t *_parameter_list();
 decl_t *_parameter_declaration();
 decl_t *_abstract_declarator(type_t *base);
