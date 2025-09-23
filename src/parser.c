@@ -247,11 +247,8 @@ node_t *expression() {
 }
 
 node_t *_declaration() {
-    type_t *decl_specs = _declaration_specifiers();
-    if (!decl_specs) return NULL;
-
-    decl_list_t *init_dectr_list = _init_declarator_list(decl_specs);
-    if (!init_dectr_list) { PANIC("expected '_init_declarator_list'\n"); }
+    type_t *decl_specs = TRY(_declaration_specifiers());
+    decl_list_t *init_dectr_list = MUST(_init_declarator_list(decl_specs));
 
     node_t *decl = new_node(ND_DECLARATION);
     decl->share.declaration.decls = init_dectr_list;
@@ -277,8 +274,7 @@ decl_list_t *_init_declarator_list(type_t *base) {
     decl_list_t *head = cur;
 
     do {
-        decl_t *i = _init_declarator(base);
-        if (!i) { PANIC("expected init-declarator"); }
+        decl_t *i = MUST(_init_declarator(base));
         decl_list_t *next = (decl_list_t *)calloc(1, sizeof(decl_list_t));
         next->self = i;
         cur->next = next;
@@ -289,12 +285,10 @@ decl_list_t *_init_declarator_list(type_t *base) {
 }
 
 decl_t *_init_declarator(type_t *base) {
-    decl_t *dectr = _declarator(base);
-    if (!dectr) return NULL;
+    decl_t *dectr = TRY(_declarator(base));
 
     if (consume("=")) {
-        node_t *init = initializer();
-        if (!init) { PANIC("expected initializer"); }
+        node_t *init = MUST(initializer());
         dectr->init = init;
     }
 
@@ -420,8 +414,7 @@ decl_list_t *_parameter_list() {
 }
 
 decl_t *_parameter_declaration() {
-    type_t *tspecs = _declaration_specifiers();
-    if (!tspecs) return NULL;
+    type_t *tspecs = TRY(_declaration_specifiers());
 
     decl_t *dectr = _declarator(tspecs);
     if (dectr) return dectr;
@@ -533,8 +526,7 @@ node_t *initializer() {
 }
 
 node_t *_function_difinition() {
-    type_t *tspecs = _declaration_specifiers();
-    if (!tspecs) return NULL;
+    type_t *tspecs = TRY(_declaration_specifiers());
 
     decl_t *dectr = MUST(_declarator(tspecs));
     // if (!dectr) { PANIC("expected '_declarator()'\n"); }

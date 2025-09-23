@@ -3,7 +3,7 @@
 #include <parser.h>
 
 int main(int argc, char *argv[]) {
-    char *code = "int f(int **a[], int b)";
+    char *code = "int f(int )";
     
     token_t *token = tokenize(code);
     // show_token(token);

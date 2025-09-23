@@ -15,10 +15,21 @@
 
 #define MUST(p)                                                             \
     ({                                                                      \
-        __auto_type _tmp = (p);                                             \
-        if (!_tmp) PANIC("expected " #p "\n");                           \
-        _tmp;                                                               \
+        __auto_type _v = (p);                                               \
+        if (!_v) PANIC("expected " #p "\n");                                \
+        _v;                                                                 \
     })                                                                      
+
+#define TRY(expr) \
+    ({                                                          \
+        token_t *_t = cur;                                      \
+        __auto_type _v = (expr);                                \
+        if (!_v) {                                              \
+            if (_t != cur) PANIC("token not recoverd!\n");      \
+            return NULL;                                        \
+        }                                                       \
+        _v;                                                     \
+    })
 
 typedef enum {
     ND_ADD,
