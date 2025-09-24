@@ -3,21 +3,29 @@
 
 #include "tokenizer.h"
 
+extern token_t *__cur, *__backtrack;
+extern token_t *__context_stack[256];
+extern int __context_stack_depth;
+
 #define LIST_MAX 256
 #define PANIC(fmt, ...)                                                     \
     do {                                                                    \
         fprintf(stderr,                                                     \
                 "PANIC at %s:%d in %s(): " fmt " rest: %.*s\n",             \
-                __FILE__, __LINE__, __func__, ##__VA_ARGS__, _cur->len, _cur->str);\
+                __FILE__, __LINE__, __func__, ##__VA_ARGS__, __cur->len, __cur->str);\
         fflush(stderr);                                                     \
         exit(1);                                                            \
     } while (0)
 
-#define TRY(p)  \
+
+
+    #define TRY(p)  \
     ({                                          \
-        backtrack = _cur;                       \
+        __context_stack[__context_stack_depth++]= __backtrack; \
+        __backtrack = __cur;                       \
         __auto_type _res = (p);                 \
-        if (!_res) _cur = backtrack;                 \
+        if (!_res) __cur = __backtrack;                 \
+        __backtrack = __context_stack[--__context_stack_depth]; \
         _res;                                    \
     })
 
@@ -25,7 +33,7 @@
     do {                                                                    \
         fprintf(stderr,                                                     \
                 "FAILED at %s:%d in %s(): " fmt " rest: %.*s\n",             \
-                __FILE__, __LINE__, __func__, ##__VA_ARGS__, _cur->len, _cur->str);\
+                __FILE__, __LINE__, __func__, ##__VA_ARGS__, __cur->len, __cur->str);\
         fflush(stderr);                                                     \
         return NULL;                                                     \
     } while (0)
@@ -35,7 +43,7 @@
         if (!consume(expected)) {                                           \
             fprintf(stderr,                                                     \
                 "EXPECTED '%s' but '%.*s' at %s:%d in %s(): \n",             \
-                expected, _cur->len, _cur->str, __FILE__, __LINE__, __func__);\
+                expected, __cur->len, __cur->str, __FILE__, __LINE__, __func__);\
             fflush(stderr);     \
             return NULL;                                                    \  
         }                                                                   \
@@ -44,16 +52,16 @@
 #define MUST(p)                                                             \
     ({                                                                      \
         __auto_type _v = (p);                                               \
-        if (!_v) PANIC("expected " #p "\n");                                \
+        if (!_v) FAIL("expected " #p "\n");                                \
         _v;                                                                 \
     })                                                                      
 
 // #define TRY(expr) \
 //     ({                                                          \
-//         token_t *_t = _cur;                                      \
+//         token_t *_t = __cur;                                      \
 //         __auto_type _v = (expr);                                \
 //         if (!_v) {                                              \
-//             if (_t != _cur) PANIC("token not recoverd!\n");      \
+//             if (_t != __cur) PANIC("token not recoverd!\n");      \
 //             return NULL;                                        \
 //         }                                                       \
 //         _v;                                                     \
@@ -253,10 +261,7 @@ decl_t *_parameter_declaration();
 decl_t *_abstract_declarator(type_t *base);
 decl_t *_direct_abstract_declarator(type_t *base);
 
-void show_node(node_t *node);
-void show_node_with_indent(node_t *node, int level);
-void show_array_with_indent(array_t *array, int level);
-void show_type(type_t *type);
+
 node_t *new_node(node_kind_t kind);
 node_t *new_node_with(node_kind_t kind, node_t *lhs, node_t *rhs);
 char *oneof(char **ones, int len);

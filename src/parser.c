@@ -3,218 +3,25 @@
 #include <stdio.h>
 #include "../inc/tokenizer.h"
 
-static token_t *_cur = NULL;
-static token_t *backtrack = NULL;
-
-void put_indent(int level) {
-    for (int i = 0; i < level; i++) {
-        printf("  ");
-    }
-}
-
-void show_node(node_t *node) {
-    show_node_with_indent(node, 0);
-}
-
-void show_node_with_indent(node_t *node, int level) {
-    if (!node) {
-        printf("show_node_with_indent: node is NULL\n");
-        exit(1);
-    }
-
-    switch (node->kind) {
-        case ND_NUM:
-            put_indent(level); printf("ND_NUM: %d\n", node->val);
-            break;
-        case ND_ADD:
-            put_indent(level); printf("ND_ADD: \n");
-            show_node_with_indent(node->lhs, level + 1);
-            show_node_with_indent(node->rhs, level + 1);
-            break;
-        case ND_SUB:
-            put_indent(level); printf("ND_SUB: \n");
-            show_node_with_indent(node->lhs, level + 1);
-            show_node_with_indent(node->rhs, level + 1);
-            break;
-        case ND_MUL:
-            put_indent(level); printf("ND_MUL: \n");
-            show_node_with_indent(node->lhs, level + 1);
-            show_node_with_indent(node->rhs, level + 1);
-            break;
-        case ND_DIV:
-            put_indent(level); printf("ND_DIV: \n");
-            show_node_with_indent(node->lhs, level + 1);
-            show_node_with_indent(node->rhs, level + 1);
-            break;
-        case ND_IDENT: 
-            put_indent(level); printf("ND_IDENT: '%.*s'\n", node->len, node->str);
-            break;
-        case ND_STRUCT_DECLARATION:
-            put_indent(level); printf("ND_STRUCT_DECLARATION\n");
-            break;
-        // case ND_TYPE_SPECIFIER:
-        //     put_indent(level); printf("ND_TYPE_SPECIFIER: '%.*s'\n", node->len, node->str);
-        //     if (node->next) {
-        //         show_node_with_indent(node->next, level);
-        //     }
-        //     break;
-        case ND_FUNCTION_DEFINITION: 
-            put_indent(level); printf("ND_FUNCTION_DEFINITION: \n");
-            put_indent(level + 1); show_type(node->share.function_difinition.decl->decl); printf("\n");
-            show_node_with_indent(node->share.function_difinition.cs, level + 1);
-            break;
-        case ND_DECLARATION:
-            put_indent(level); printf("ND_DECLARATION: \n");
-            for (decl_list_t *cur = node->share.declaration.decls; cur; cur = cur->next) {
-                if (cur->self->ident) {
-                    put_indent(level + 1); printf("%.*s: ", cur->self->ident->len, cur->self->ident->str);
-                } else {
-                    PANIC("EXPECTed ident\n");
-                }
-                show_type(cur->self->decl);
-                if (cur->self->init) {
-                    put_indent(level + 1); printf("init: \n");
-                    show_node_with_indent(cur->self->init, level + 2);
-                }
-                printf("\n");
-            }
-            break;
-        case ND_COMPOUND_STATEMENT:
-            put_indent(level); printf("ND_COMPOUND_STATEMENT: \n");
-            for (node_list_t *cur = node->share.compound_statement.block_item_list_opt; cur; cur = cur->next) {
-                show_node_with_indent(cur->self, level + 1);
-            }
-            break;
-        case ND_ASSIGNMENT_EXPRESSION:
-            put_indent(level); printf("ND_ASSIGNMENT_EXPRESSION: \n");
-            show_node_with_indent(node->share.assignment_expression.unary_expression, level + 1);
-            put_indent(level + 1); printf("op: %s\n", node->share.assignment_expression.assignment_operator);
-            show_node_with_indent(node->share.assignment_expression.rec, level + 1);
-            break;
-        // case ND_DECLARATOR:
-        //     put_indent(level); printf("ND_DECLARATOR: \n");
-        //     if (node->share.declarator.ptr_opt) {
-        //         show_node_with_indent(node->share.declarator.ptr_opt, level + 1);
-        //     }
-        //     show_node_with_indent(node->share.declarator.direct_decl, level + 1);
-        //     break;
-        // case ND_DIRECT_DECLARATOR:
-        //     put_indent(level); printf("ND_DIRECT_DECLARATOR:\n");
-        //     if (node->share.direct_declarator.ident) {
-        //         put_indent(level + 1); printf("Identifier: \n");
-        //         show_node_with_indent(node->share.direct_declarator.ident, level + 2);
-        //     } else if (node->share.direct_declarator.braced_declarator) {
-        //         put_indent(level + 1); printf("Braced: \n");
-        //         show_node_with_indent(node->share.direct_declarator.braced_declarator, level + 2);
-        //     }
-
-        //     if (node->share.direct_declarator.array) {
-        //         put_indent(level + 1); printf("Array: \n");
-        //         show_array_with_indent(node->share.direct_declarator.array, level + 2);
-        //     }
-        //     // TODO: show marr as ini 
-        //     break;
-        // case ND_INIT_DECLARATOR:
-        //     put_indent(level); printf("ND_INIT_DECLARATOR:\n");
-        //     show_node_with_indent(node->lhs, level + 1);
-        //     if (node->rhs) {
-        //         show_node_with_indent(node->rhs, level + 1);
-        //     } else {
-        //         put_indent(level + 1); printf("initializer: None\n");
-        //     }
-        //     break;
-        // case ND_POINTER:
-        //     put_indent(level); printf("ND_POINTER: *\n");
-        //     if (node->share.pointer.tqs_opt) {
-        //         put_indent(level + 1); printf("type qualifier list optional, but not show yet\n");
-        //     } 
-        //     if (node->share.pointer.ptr_opt) {
-        //         show_node_with_indent(node->share.pointer.ptr_opt, level + 1);
-        //     }
-        //     break;
-        default:
-            printf("default");
-            break;
-    }
-}
-
-void show_type(type_t *t) {
-    if (!t) {
-        printf("show_type: NULL\n");
-        exit(1);
-    }
-
-    switch (t->kind) {
-        case VOID:
-            printf("void");
-            break;
-        case INT:
-            printf("int");
-            break;
-        case PTR:
-            printf("* -> (");
-            show_type(t->ptr_to);
-            printf(")");
-            break;
-        case ARRAY:
-            printf("[] -> (");
-            show_type(t->array_to);
-            printf(")");
-            break;
-        case FUN:
-            printf("fn(");
-            for (decl_list_t *cur = t->params; cur; cur = cur->next) {
-                show_type(cur->self->decl);
-                if (cur->next)
-                    printf(", ");
-            }
-            printf(") -> (");
-            show_type(t->ret);
-            printf(")");
-            break;
-        case STRUCT:
-            printf("struct ");
-            if (t->share.struct_or_union_specifier.ident_opt) {
-                printf("%.*s", t->share.struct_or_union_specifier.ident_opt->len, t->share.struct_or_union_specifier.ident_opt->str);
-            }
-            break;
-        default:
-            printf("default\n");
-            break;
-    }
-}
-
-void show_array_with_indent(array_t *array, int level) {
-    put_indent(level); printf("[%d]\n", array->len);
-    if (array->next) {
-        show_array_with_indent(array->next, level + 1);
-    }
-}
+token_t *__cur = NULL;
+token_t *__backtrack = NULL;
+token_t *__context_stack[256] = {NULL};
+int __context_stack_depth = 0;
 
 node_t *parse(token_t *token) {
-    _cur = token;
+    __cur = token;
+    __backtrack = __cur;
 
     node_t *exd = _external_declaration();
     
     return exd;
 }
 
-void consume_brace() {
-    EXPECT("(");
-
-    while (_cur) {
-        if (!_cur) PANIC("expected )");
-        
-        if (consume(")")) return; 
-
-        if (peek("(")) consume_brace();
-        else _cur = _cur->next;
-    }
-}
-
 node_t *_external_declaration() {
-    node_t *fd = try_(_function_definition);
+    node_t *fd = TRY(_function_definition());
     if (fd) return fd;
+
+    // PANIC("koko");
 
     node_t *decl = _declaration();
     if (decl) return decl;
@@ -223,7 +30,6 @@ node_t *_external_declaration() {
 }
 
 node_t *_function_definition() {
-    printf("trace\n");
     type_t *tspecs = _declaration_specifiers();
     if (!tspecs) FAIL("toplevel");
 
@@ -241,12 +47,12 @@ node_t *_function_definition() {
 }
 
 node_t *identifier() {
-    if (_cur->kind == TK_IDENT) {
+    if (__cur->kind == TK_IDENT) {
         node_t *ident = new_node(ND_IDENT);
-        ident->str = _cur->str;
-        ident->len = _cur->len;
+        ident->str = __cur->str;
+        ident->len = __cur->len;
 
-        _cur = _cur->next;
+        __cur = __cur->next;
         return ident;
     } else {
         return NULL;
@@ -254,16 +60,16 @@ node_t *identifier() {
 }
 
 node_t *constant() {
-    if (_cur->kind != TK_NUM) {
+    if (__cur->kind != TK_NUM) {
         printf("constant(): EXPECT number but\n");
         exit(1);
     }
 
     node_t *node = (node_t *)calloc(1, sizeof(node_t));
     node->kind = ND_NUM;
-    node->val = _cur->val;
+    node->val = __cur->val;
     
-    _cur = _cur->next;
+    __cur = __cur->next;
 
     return node;
 }
@@ -272,14 +78,14 @@ node_t *primary_expression() {
     node_t *ident = identifier();
     if (ident) return ident;
 
-    if (_cur->kind == TK_NUM) {
+    if (__cur->kind == TK_NUM) {
         return constant();
     } else if (consume("(")) {
         node_t *e = expression();
         EXPECT(")");
         return e;
     } else {
-        PANIC("primary_expression: unimplemented! %s\n", _cur->str);
+        PANIC("primary_expression: unimplemented! %s\n", __cur->str);
     }
 }
 
@@ -425,7 +231,7 @@ type_t *_type_specifier() {
 }
 
 type_t *_struct_or_union_specifier() {
-    token_t *_s = _cur;
+    token_t *_s = __cur;
     type_t *st = _struct_or_union();
     if (!st) return st;
 
@@ -512,13 +318,13 @@ type_t *_struct_or_union() {
 }
 
 decl_t *_declarator(type_t *base) {
-    token_t *backtrack = _cur;
+    token_t *__backtrack = __cur;
 
     type_t *ptr_opt = _pointer(base);
     decl_t *direct_decl = _direct_declarator(ptr_opt);
 
     if (!direct_decl) {
-        _cur = backtrack;
+        __cur = __backtrack;
         return NULL;
     }
 
@@ -526,18 +332,18 @@ decl_t *_declarator(type_t *base) {
 }
 
 decl_t *_direct_declarator(type_t *base) {
-    token_t *b = _cur;
+    token_t *b = __cur;
     type_t *braced = NULL;
 
     node_t *ident = identifier();
 
     printf("ident\n");
     if (!ident) {
-        printf("no %s\n", _cur->str);
+        printf("no %s\n", __cur->str);
         if (consume("(")) {
             decl_t *dectr = _declarator(NULL);
             if (!dectr) {
-                _cur = b;
+                __cur = b;
                 return NULL;
             }
 
@@ -637,7 +443,7 @@ decl_t *_parameter_declaration() {
 
     if (abst_dectr) return abst_dectr;
 
-    return tspecs;
+    // return tspecs;
     // decl_t *abst_dectr = _abstract_declarator(tspecs);
     // if (!abst_dectr) { PANIC("EXPECTed abstract-declarator()"); }
 
@@ -837,13 +643,13 @@ char *oneof(char **ones, int len) {
 } 
 
 bool consume(char *op) {
-    if (!_cur) PANIC("current token is null\n");
+    if (!__cur) PANIC("current token is null\n");
 
-    if (_cur->kind == TK_RESERVED || _cur->kind == TK_IDENT) {
-        // printf("compare %s to %.*s\n", op, _cur->len, _cur->str);
-        if (_cur->len == strlen(op) && strncmp(_cur->str, op, _cur->len) == 0) {
+    if (__cur->kind == TK_RESERVED || __cur->kind == TK_IDENT) {
+        // printf("compare %s to %.*s\n", op, __cur->len, __cur->str);
+        if (__cur->len == strlen(op) && strncmp(__cur->str, op, __cur->len) == 0) {
             // printf("match\n");
-            _cur = _cur->next;
+            __cur = __cur->next;
             return true;
         }
     }
@@ -852,10 +658,10 @@ bool consume(char *op) {
 }
 
 bool peek(char *op) {
-    if (!_cur) PANIC("current token is null\n");
+    if (!__cur) PANIC("current token is null\n");
 
-    if (_cur->kind == TK_RESERVED || _cur->kind == TK_IDENT) {
-        if (_cur->len == strlen(op) && strncmp(_cur->str, op, _cur->len) == 0) {
+    if (__cur->kind == TK_RESERVED || __cur->kind == TK_IDENT) {
+        if (__cur->len == strlen(op) && strncmp(__cur->str, op, __cur->len) == 0) {
             return true;
         }
     }
@@ -864,13 +670,13 @@ bool peek(char *op) {
 }
 
 bool type(char *c) {
-    if (!_cur) PANIC("current token is null\n");
+    if (!__cur) PANIC("current token is null\n");
 
-    // printf("compare %s to %s\n", c, _cur->str);
+    // printf("compare %s to %s\n", c, __cur->str);
 
-    if (_cur->kind == TK_TYPE) {
-        if (_cur->len == strlen(c) && strncmp(_cur->str, c, _cur->len) == 0) {
-            _cur = _cur->next;
+    if (__cur->kind == TK_TYPE) {
+        if (__cur->len == strlen(c) && strncmp(__cur->str, c, __cur->len) == 0) {
+            __cur = __cur->next;
             return true;
         }
     }
@@ -879,14 +685,14 @@ bool type(char *c) {
 }
 
 void expect(char *op) {
-    if (_cur->kind == TK_RESERVED || _cur->kind == TK_IDENT) {
-        if (_cur->len == strlen(op) && strncmp(_cur->str, op, _cur->len) == 0) {
-            _cur = _cur->next;
+    if (__cur->kind == TK_RESERVED || __cur->kind == TK_IDENT) {
+        if (__cur->len == strlen(op) && strncmp(__cur->str, op, __cur->len) == 0) {
+            __cur = __cur->next;
             return;
         }
     }
 
-    printf("EXPECT '%s' but '%.*s'\n", op, _cur->len, _cur->str);
+    printf("EXPECT '%s' but '%.*s'\n", op, __cur->len, __cur->str);
     exit(1);
 }
 
@@ -902,8 +708,8 @@ char *peek_types(char *names[], int len) {
 }
 
 bool peek_type(char *name) {
-    if (_cur->kind == TK_TYPE) {
-        if (_cur->len == strlen(name) && strncmp(_cur->str, name, _cur->len) == 0) {   
+    if (__cur->kind == TK_TYPE) {
+        if (__cur->len == strlen(name) && strncmp(__cur->str, name, __cur->len) == 0) {   
             return true;
         }
     }
@@ -929,14 +735,14 @@ node_t *new_node(node_kind_t kind) {
 
 // パースが失敗してもトークンを消費しないパーサにtryは必要ない
 node_t *try_(node_t *(*p)()) {
-    token_t *_backtrack = _cur;
+    token_t *___backtrack = __cur;
     node_t *res = p();
 
     if (res) {
         return res;
     } else {
         // printf("try fial\n");
-        _cur = _backtrack;
+        __cur = ___backtrack;
         return NULL;
     }
 }
