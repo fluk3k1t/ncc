@@ -237,22 +237,25 @@ node_kind_t classify_external_declaration() {
 }
 
 node_t *_external_declaration() {
-    switch (classify_external_declaration()) {
-        case ND_FUNCTION_DEFINITION:    return _function_definition();
-        case ND_DECLARATION:            return _declaration();
-        default:                        PANIC("unreachable!\n");
-    }
+    node_t *fd = try_(_function_definition);
+    if (fd) return fd;
+
+    node_t *decl = _declaration();
+    if (decl) return decl;
+    
+    PANIC("no matching syntax!\n");
 }
 
 node_t *_function_definition() {
+    printf("trace\n");
     type_t *tspecs = _declaration_specifiers();
-    if (!tspecs) PANIC("toplevel");
+    if (!tspecs) FAIL("toplevel");
 
     decl_t *decl = _declarator(tspecs);
-    if (!decl) { PANIC("EXPECTed '_declarator()'\n"); }
+    if (!decl) { FAIL("EXPECTed '_declarator()'\n"); }
 
     node_t *cs = _compound_statement();
-    if (!cs) PANIC("expected compound statement\n");
+    if (!cs) FAIL("expected compound statement\n");
 
     node_t *fd = new_node(ND_FUNCTION_DEFINITION);
     fd->share.function_difinition.decl = decl;
@@ -375,7 +378,7 @@ node_t *_declaration() {
     decl_list_t *init_dectr_list = _init_declarator_list(decl_specs);
     if (!init_dectr_list) { PANIC("EXPECTed '_init_declarator_list'\n"); }
 
-    expect(";");
+    EXPECT(";");
 
     node_t *decl = new_node(ND_DECLARATION);
     decl->share.declaration.decls = init_dectr_list;
@@ -445,8 +448,7 @@ type_t *_struct_or_union_specifier() {
     if (consume("{")) {
         EXPECT("}");
     } else {
-        // if (!ident_opt) 
-        PANIC("expected identifier");
+        if (!ident_opt) PANIC("expected identifier");
         
     }
 }
@@ -860,13 +862,14 @@ node_t *new_node(node_kind_t kind) {
 
 // パースが失敗してもトークンを消費しないパーサにtryは必要ない
 node_t *try_(node_t *(*p)()) {
-    backtrack = _cur;
+    token_t *_backtrack = _cur;
     node_t *res = p();
+
     if (res) {
         return res;
     } else {
-        printf("try fial\n");
-        _cur = backtrack;
+        // printf("try fial\n");
+        _cur = _backtrack;
         return NULL;
     }
 }

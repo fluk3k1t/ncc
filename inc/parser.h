@@ -13,20 +13,24 @@
         exit(1);                                                            \
     } while (0)
 
-#define EXPECT(expected)                                                    \
+#define TRY(p)  \
+    do {
+        backtrack = _cur;
+        __auto_type _res = (p);
+        if (!_res) return NULL;
+        
+    }
+
+#define FAIL(fmt, ...)                                                     \
     do {                                                                    \
-        if (!consume(expected)) {                                           \
-            fprintf(stderr,                                                 \
-                    "EXPECTED '%s' but '%.*s' at %s:%d in %s(): \n",        \
-                    expected, _cur->len, _cur->str, __FILE__, __LINE__, __func__); \
-            fflush(stderr);                                                 \
-            exit(1);                                                        \  
-        }                                                                   \
+        fprintf(stderr,                                                     \
+                "FAILED at %s:%d in %s(): " fmt " rest: %.*s\n",             \
+                __FILE__, __LINE__, __func__, ##__VA_ARGS__, _cur->len, _cur->str);\
+        fflush(stderr);                                                     \
+        return NULL;                                                     \
     } while (0)
 
-
-
-#define EXPECTED(expected)                                                  \
+#define EXPECT(expected)                                                  \
     do {                                                                    \
         if (!consume(expected)) {                                           \
             return NULL;                                                    \  
