@@ -426,35 +426,33 @@ decl_t *_init_declarator(type_t *base) {
 }
 
 type_t *_type_specifier() {
-    type_t *t = (type_t *)calloc(1, sizeof(type_t));
+    if (type("void"))           return new_type(VOID);
+    else if (type("char"))      return new_type(CHAR);
+    else if (type("short"))     return new_type(SHORT);
+    else if (type("int"))       return new_type(INT);
+    else if (type("long"))      return new_type(LONG);
+    else if (type("float"))     PANIC("todo!()\n");
+    else if (type("double"))    PANIC("todo!()\n");
+    else if (type("signed"))    PANIC("todo!()\n");
+    else if (type("unsigned"))  PANIC("todo!()\n");
+    else                           return NULL;
+}
 
-    if (type("void")) {
-        t->kind = VOID;
-    } else if (type("char")) {
-        t->kind = CHAR;
-    } else if (type("short")) {
-        t->kind = SHORT;  
-    } else if (type("int")) {
-        t->kind = INT;  
-    } else if (type("long")) {
-        t->kind = LONG;  
-    } else if (type("float")) {
-        PANIC("todo!()\n");
-        // t->kind = FLOAT;  
-    } else if (type("double")) {
-        PANIC("todo!()\n");
-        // t->kind = DOUBLE;  
-    } else if (type("signed")) {
-        PANIC("todo!()\n");
-        // t->kind = SHORT;  
-    } else if (type("unsigned")) {
-        PANIC("todo!()\n");
-        // t->kind = SHORT;  
+type_t *_struct_or_union_specifier() {
+    type_t *st = _struct_or_union();
+    node_t *ident_opt = identifier();
+    
+    if (consume("{")) {
+        EXPECT("}");
     } else {
-        return NULL;
+        // if (!ident_opt) 
+        PANIC("expected identifier");
+        
     }
+}
 
-    return t;
+type_t *_struct_or_union() {
+
 }
 
 decl_t *_declarator(type_t *base) {

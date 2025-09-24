@@ -24,6 +24,15 @@
         }                                                                   \
     } while (0)
 
+
+
+#define EXPECTED(expected)                                                  \
+    do {                                                                    \
+        if (!consume(expected)) {                                           \
+            return NULL;                                                    \  
+        }                                                                   \
+    } while (0)
+
 #define MUST(p)                                                             \
     ({                                                                      \
         __auto_type _v = (p);                                               \
@@ -185,6 +194,8 @@ decl_t *_declarator(type_t *base);
 type_t *_pointer(type_t *base);
 decl_t *_direct_declarator(type_t *base);
 type_t *_type_specifier();
+type_t *_struct_or_union_specifier();
+type_t *_struct_or_union();
 type_t *_declaration_specifiers();
 decl_list_t *_init_declarator_list(type_t *base);
 decl_t *_init_declarator(type_t *base);
