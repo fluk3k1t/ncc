@@ -3,7 +3,7 @@
 #include "../inc/parser.h"
 
 int main(int argc, char *argv[]) {
-    char *code = "short a (int);";
+    char *code = "struct node_t { int a; };";
     
     token_t *token = tokenize(code);
     // show_token(token);

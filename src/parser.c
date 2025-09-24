@@ -49,6 +49,9 @@ void show_node_with_indent(node_t *node, int level) {
         case ND_IDENT: 
             put_indent(level); printf("ND_IDENT: '%.*s'\n", node->len, node->str);
             break;
+        case ND_STRUCT_DECLARATION:
+            put_indent(level); printf("ND_STRUCT_DECLARATION\n");
+            break;
         // case ND_TYPE_SPECIFIER:
         //     put_indent(level); printf("ND_TYPE_SPECIFIER: '%.*s'\n", node->len, node->str);
         //     if (node->next) {
@@ -169,6 +172,12 @@ void show_type(type_t *t) {
             show_type(t->ret);
             printf(")");
             break;
+        case STRUCT:
+            printf("struct ");
+            if (t->share.struct_or_union_specifier.ident_opt) {
+                printf("%.*s", t->share.struct_or_union_specifier.ident_opt->len, t->share.struct_or_union_specifier.ident_opt->str);
+            }
+            break;
         default:
             printf("default\n");
             break;
@@ -201,39 +210,6 @@ void consume_brace() {
         if (peek("(")) consume_brace();
         else _cur = _cur->next;
     }
-}
-
-node_kind_t classify_external_declaration() {
-    token_t *_reserved_cur = _cur;
-
-    while (!peek("(")) {
-        if (peek(";")) {
-            printf("classyfi declaration\n");
-            _cur = _reserved_cur;
-            return ND_DECLARATION;
-        }
-        _cur = _cur->next;
-        if (!_cur) PANIC("expected '('");
-    }
-
-    consume_brace();
-
-    if (!_cur) PANIC("expected ')'");
-
-    node_kind_t res = ND_ILLEGAL;
-
-    if (strncmp(_cur->str, "{", 1) == 0) {
-        res = ND_FUNCTION_DEFINITION;
-        printf("classify function definition\n");
-    } else if (strncmp(_cur->str, ";", 1) == 0) {
-        res = ND_DECLARATION;
-        printf("classify declaration\n");
-    } else {
-        PANIC("expected ';' or '{'\n");
-    }
-
-    _cur = _reserved_cur;
-    return res;
 }
 
 node_t *_external_declaration() {
@@ -375,13 +351,15 @@ node_t *_declaration() {
     type_t *decl_specs = _declaration_specifiers();
     if (!decl_specs) return NULL;
 
-    decl_list_t *init_dectr_list = _init_declarator_list(decl_specs);
-    if (!init_dectr_list) { PANIC("EXPECTed '_init_declarator_list'\n"); }
+    // TODO: optionalのハンドリング
+    // TODO: tryのバックトラックそのものの退避が必要な希ガス
+    decl_list_t *init_dectr_list_opt = TRY(_init_declarator_list(decl_specs));
+    // if (!init_dectr_list) { return  }
 
     EXPECT(";");
 
     node_t *decl = new_node(ND_DECLARATION);
-    decl->share.declaration.decls = init_dectr_list;
+    decl->share.declaration.decls = init_dectr_list_opt;
 
     return decl;
 }
@@ -405,7 +383,7 @@ decl_list_t *_init_declarator_list(type_t *base) {
 
     do {
         decl_t *i = _init_declarator(base);
-        if (!i) { PANIC("EXPECTed init-declarator"); }
+        if (!i) { FAIL("EXPECTed init-declarator"); }
         decl_list_t *next = (decl_list_t *)calloc(1, sizeof(decl_list_t));
         next->self = i;
         cur->next = next;
@@ -438,23 +416,99 @@ type_t *_type_specifier() {
     else if (type("double"))    PANIC("todo!()\n");
     else if (type("signed"))    PANIC("todo!()\n");
     else if (type("unsigned"))  PANIC("todo!()\n");
-    else                           return NULL;
-}
+    else {
+        type_t *st = TRY(_struct_or_union_specifier());
+        if (st) return st;
 
-type_t *_struct_or_union_specifier() {
-    type_t *st = _struct_or_union();
-    node_t *ident_opt = identifier();
-    
-    if (consume("{")) {
-        EXPECT("}");
-    } else {
-        if (!ident_opt) PANIC("expected identifier");
-        
+        return NULL;
     }
 }
 
-type_t *_struct_or_union() {
+type_t *_struct_or_union_specifier() {
+    token_t *_s = _cur;
+    type_t *st = _struct_or_union();
+    if (!st) return st;
 
+    node_t *ident_opt = identifier();
+    
+    if (consume("{")) {
+        node_t *stdecls = _struct_declaration_list();
+        if (!stdecls) FAIL("expected struct declaration list");
+
+        EXPECT("}");
+        
+        st->share.struct_or_union_specifier.ident_opt = ident_opt;
+        st->share.struct_or_union_specifier.struct_declaration_list = stdecls; 
+
+        return st;
+    } else {
+        // if (!ident_opt) PANIC("expected identifier");
+        PANIC("");
+    }
+}
+
+// struct-declaration-list := struct-declaration+
+node_t *_struct_declaration_list() {
+    return _struct_declaration();
+}
+
+// struct-declaration := specifier-qualifier-list struct-declarator-list? ";"
+//                     | static_assert-declaration
+node_t *_struct_declaration() {
+    type_list_t *specs = _specifier_qualifier_list();
+    if (!specs) return NULL;
+
+    decl_list_t *decls = _struct_declarator_list();
+
+    EXPECT(";");
+
+    node_t *stdecl = new_node(ND_STRUCT_DECLARATION);
+    stdecl->share.struct_declaration.specs = specs;
+    stdecl->share.struct_declaration.struct_declarator_list_opt = decls;
+
+    return stdecl;
+}
+
+// specifier-qualifier-list := (type-specifier | type-qualifier)+
+type_list_t *_specifier_qualifier_list() {
+    type_list_t *head = NULL;
+    type_list_t **tail = &head;
+
+    while (1) {
+        type_t *tspec = _type_specifier();
+        if (!tspec) break;
+
+        type_list_t *ts = (type_list_t *)calloc(1, sizeof(type_list_t));
+        ts->self = tspec;
+        *tail = ts;
+        tail = &ts->next;
+    }
+
+    return head;
+}
+
+// struct-declarator-list := struct-declarator ("," struct-declarator)*
+decl_list_t *_struct_declarator_list() {
+    decl_t *decl = _struct_declarator();
+    if (!decl) return NULL;
+    
+    decl_list_t *decls = (decl_list_t *)calloc(1, sizeof(decl_list_t));
+    decls->self = decl;
+
+    return decls;
+}
+
+// struct-declarator := declarator
+//                    | declarator? : constant-expression
+decl_t *_struct_declarator() {
+    return _declarator(NULL);
+}
+
+// struct-or-union := "struct" | "union"
+type_t *_struct_or_union() {
+    if      (type("struct"))    return new_type(STRUCT);
+    else if (type("union"))     return new_type(UNION);
+    else                           return NULL; 
 }
 
 decl_t *_declarator(type_t *base) {
@@ -472,13 +526,21 @@ decl_t *_declarator(type_t *base) {
 }
 
 decl_t *_direct_declarator(type_t *base) {
+    token_t *b = _cur;
     type_t *braced = NULL;
 
     node_t *ident = identifier();
 
+    printf("ident\n");
     if (!ident) {
+        printf("no %s\n", _cur->str);
         if (consume("(")) {
             decl_t *dectr = _declarator(NULL);
+            if (!dectr) {
+                _cur = b;
+                return NULL;
+            }
+
             braced = dectr->decl;
             // 冗長かも?
             ident = dectr->ident;
@@ -487,7 +549,7 @@ decl_t *_direct_declarator(type_t *base) {
             // abstに委譲
             return NULL;
         }
-    }
+    }else printf("aru\n");
 
     while (1) {
         if (consume("[")) {
@@ -568,9 +630,14 @@ decl_t *_parameter_declaration() {
     type_t *tspecs = _declaration_specifiers();
     if (!tspecs) return NULL;
 
-    decl_t *dectr = _declarator(tspecs);
+    decl_t *dectr = TRY(_declarator(tspecs));
     if (dectr) return dectr;
 
+    decl_t *abst_dectr = _abstract_declarator(tspecs);
+
+    if (abst_dectr) return abst_dectr;
+
+    return tspecs;
     // decl_t *abst_dectr = _abstract_declarator(tspecs);
     // if (!abst_dectr) { PANIC("EXPECTed abstract-declarator()"); }
 

@@ -14,12 +14,12 @@
     } while (0)
 
 #define TRY(p)  \
-    do {
-        backtrack = _cur;
-        __auto_type _res = (p);
-        if (!_res) return NULL;
-        
-    }
+    ({                                          \
+        backtrack = _cur;                       \
+        __auto_type _res = (p);                 \
+        if (!_res) _cur = backtrack;                 \
+        _res;                                    \
+    })
 
 #define FAIL(fmt, ...)                                                     \
     do {                                                                    \
@@ -33,6 +33,10 @@
 #define EXPECT(expected)                                                  \
     do {                                                                    \
         if (!consume(expected)) {                                           \
+            fprintf(stderr,                                                     \
+                "EXPECTED '%s' but '%.*s' at %s:%d in %s(): \n",             \
+                expected, _cur->len, _cur->str, __FILE__, __LINE__, __func__);\
+            fflush(stderr);     \
             return NULL;                                                    \  
         }                                                                   \
     } while (0)
@@ -44,16 +48,16 @@
         _v;                                                                 \
     })                                                                      
 
-#define TRY(expr) \
-    ({                                                          \
-        token_t *_t = _cur;                                      \
-        __auto_type _v = (expr);                                \
-        if (!_v) {                                              \
-            if (_t != _cur) PANIC("token not recoverd!\n");      \
-            return NULL;                                        \
-        }                                                       \
-        _v;                                                     \
-    })
+// #define TRY(expr) \
+//     ({                                                          \
+//         token_t *_t = _cur;                                      \
+//         __auto_type _v = (expr);                                \
+//         if (!_v) {                                              \
+//             if (_t != _cur) PANIC("token not recoverd!\n");      \
+//             return NULL;                                        \
+//         }                                                       \
+//         _v;                                                     \
+//     })
 
 typedef enum {
     ND_ADD,
@@ -106,6 +110,7 @@ typedef enum {
     ND_EXPRESSION_STATEMENT,
     ND_ASSIGNMENT_EXPRESSION,
     ND_ILLEGAL,
+    ND_STRUCT_DECLARATION,
 } node_kind_t;
 
 typedef struct array_t array_t;
@@ -118,6 +123,8 @@ typedef struct node_t node_t;
 typedef struct node_list_t node_list_t;
 typedef struct decl_t decl_t;
 typedef struct decl_list_t decl_list_t;
+typedef struct type_t type_t;
+typedef struct type_list_t type_list_t;
 
 struct node_t {
     node_t *next;
@@ -150,6 +157,11 @@ struct node_t {
         } function_difinition;
 
         struct {
+            type_list_t *specs;
+            decl_list_t *struct_declarator_list_opt;
+        } struct_declaration;
+
+        struct {
             node_t *ptr_opt, *direct_decl;
         } declarator;
 
@@ -170,17 +182,27 @@ struct node_list_t {
 };
 
 typedef enum {
-    VOID, CHAR, SHORT, INT, LONG, STRUCT, PTR, ARRAY, FUN
+    VOID, CHAR, SHORT, INT, LONG, STRUCT, UNION, PTR, ARRAY, FUN
 } type_kind_t;
 
-
-typedef struct type_t type_t;
 struct type_t {
     type_kind_t kind;
     type_t *ptr_to, *ret, *array_to;
     decl_list_t *params;
     char *name;
     int len;
+
+    union {
+        struct {
+            node_t *ident_opt;
+            node_t *struct_declaration_list;
+        } struct_or_union_specifier;
+    } share;
+};
+
+struct type_list_t {
+    type_list_t *next;
+    type_t *self;
 };
 
 struct decl_t {
@@ -199,6 +221,11 @@ type_t *_pointer(type_t *base);
 decl_t *_direct_declarator(type_t *base);
 type_t *_type_specifier();
 type_t *_struct_or_union_specifier();
+node_t *_struct_declaration_list();
+node_t *_struct_declaration();
+type_list_t *_specifier_qualifier_list();
+decl_list_t *_struct_declarator_list();
+decl_t *_struct_declarator();
 type_t *_struct_or_union();
 type_t *_declaration_specifiers();
 decl_list_t *_init_declarator_list(type_t *base);
