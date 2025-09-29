@@ -17,7 +17,20 @@
         } while (0);        
 #endif
 
+typedef struct {
+    decl_t *decl;
+    int size;
+    int allign;
+} env_t;
+
+typedef struct {
+    env_t *self[255];
+    int depth, allign;
+} env_stack_t;
+
 void codegen(const char* output_path, node_list_t *nodes);
 void _codegen(node_t *node);
+void gen_lvar(node_t *node);
+env_t *find(char *ident, int len);
 
 #endif

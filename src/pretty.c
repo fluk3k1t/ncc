@@ -135,6 +135,11 @@ void show_type(type_t *t) {
             printf(")");
             break;
         case STRUCT:
+            // if (t->share.struct_or_union_specifier.is_definition) {
+            //     printf("is difinition\n");
+            // } else {
+            //     printf(" is not difinition\n");
+            // }
             printf("struct ");
             if (t->share.struct_or_union_specifier.ident_opt) {
                 printf("%.*s\n", t->share.struct_or_union_specifier.ident_opt->len, t->share.struct_or_union_specifier.ident_opt->str);

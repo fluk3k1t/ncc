@@ -1,0 +1,16 @@
+"filename", "language", "C++", "C", "Markdown", "Makefile", "comment", "blank", "total"
+"/workspaces/ncc/Makefile", "Makefile", 0, 0, 0, 42, 0, 14, 56
+"/workspaces/ncc/README.md", "Markdown", 0, 0, 1, 0, 0, 0, 1
+"/workspaces/ncc/inc/codegen.h", "C++", 18, 0, 0, 0, 0, 5, 23
+"/workspaces/ncc/inc/parser.h", "C", 0, 230, 0, 0, 15, 37, 282
+"/workspaces/ncc/inc/pretty.h", "C++", 17, 0, 0, 0, 0, 4, 21
+"/workspaces/ncc/inc/semantics.h", "C++", 6, 0, 0, 0, 0, 3, 9
+"/workspaces/ncc/inc/tokenizer.h", "C", 0, 30, 0, 0, 0, 7, 37
+"/workspaces/ncc/src/codegen.c", "C", 0, 66, 0, 0, 1, 11, 78
+"/workspaces/ncc/src/main.c", "C", 0, 16, 0, 0, 2, 7, 25
+"/workspaces/ncc/src/parser.c", "C", 0, 536, 0, 0, 36, 155, 727
+"/workspaces/ncc/src/pretty.c", "C", 0, 147, 0, 0, 0, 9, 156
+"/workspaces/ncc/src/semantics.c", "C", 0, 23, 0, 0, 0, 3, 26
+"/workspaces/ncc/src/tokenizer.c", "C", 0, 123, 0, 0, 0, 20, 143
+"/workspaces/ncc/test/tokenizer.c", "C", 0, 6, 0, 0, 0, 3, 9
+"Total", "-", 41, 1177, 1, 42, 54, 278, 1593

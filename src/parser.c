@@ -155,6 +155,7 @@ node_t *expression() {
     return e;
 }
 
+// declaration := declaration-specifiers init-declarator-list? ";"
 node_t *_declaration() {
     type_t *decl_specs = MUST(_declaration_specifiers());
     decl_list_t *init_dectr_list_opt = TRY(_init_declarator_list(decl_specs));
@@ -164,8 +165,17 @@ node_t *_declaration() {
     node_t *decl = new_node(ND_DECLARATION);
     if (init_dectr_list_opt) 
         decl->share.declaration.decls = init_dectr_list_opt;
-    else 
-        decl->share.declaration.struct_declaration = decl_specs;
+    else {
+        init_dectr_list_opt = (decl_list_t *)calloc(1, sizeof(decl_list_t));
+        decl_t *d = (decl_t *)calloc(1, sizeof(decl_t));
+        d->decl = decl_specs;
+        init_dectr_list_opt->self = d;
+        decl->share.declaration.decls = init_dectr_list_opt;
+    }
+    // if (decl_specs->share.struct_or_union_specifier.is_definition) {
+    //     node_t *deff = new_node(ND_STRUCT_DEFINITION);
+    //     deff->
+    // }
 
     return decl;
 }
@@ -228,12 +238,18 @@ type_t *_type_specifier() {
     }
 }
 
+// struct-or-union-specifier := struct-or-union identifier? "{" struct-declaration-list "}"
+//                            | struct-or-union identifier
 type_t *_struct_or_union_specifier() {
     type_t *st = _struct_or_union();
     if (!st) return st;
 
     node_t *ident_opt = identifier();
     
+    // structのdefとdeclの分岐
+    // struct-declaration-listの有無で上位の呼び出しもとで判断
+    // struct_declaration_listはmustなので、declの場合は非null
+    // 構文的にはmustだけど、実用上は空のstructが定義できるはず＜－できる
     if (consume("{")) {
         node_t *stdecls = _struct_declaration_list();
         if (!stdecls) FAIL("expected struct declaration list");
@@ -242,11 +258,17 @@ type_t *_struct_or_union_specifier() {
         
         st->share.struct_or_union_specifier.ident_opt = ident_opt;
         st->share.struct_or_union_specifier.struct_declaration_list = stdecls; 
+        st->share.struct_or_union_specifier.is_definition = true;
+        // PANIC("is difinition\n");
 
         return st;
     } else {
-        // if (!ident_opt) PANIC("expected identifier");
-        PANIC("");
+        if (!ident_opt) FAIL("expected identifier");
+        
+        st->share.struct_or_union_specifier.ident_opt = ident_opt; 
+        st->share.struct_or_union_specifier.is_definition = false;
+
+        return st;
     }
 }
 
@@ -265,6 +287,7 @@ node_t *_struct_declaration() {
 
     EXPECT(";");
 
+    // これこそメタ情報でしかないはず？初期化ないよね？
     node_t *stdecl = new_node(ND_STRUCT_DECLARATION);
     stdecl->share.struct_declaration.specs = specs;
     stdecl->share.struct_declaration.struct_declarator_list_opt = decls;
@@ -583,8 +606,8 @@ node_t *_compound_statement() {
         EXPECT("}");
         node_t *cps = new_node(ND_COMPOUND_STATEMENT);
         cps->share.compound_statement.block_item_list_opt = bs;
-        show_node(cps);
-        exit(1);
+        // show_node(cps);
+        // exit(1);
         return cps;
     } else {
         return NULL;

@@ -118,7 +118,10 @@ typedef enum {
     ND_EXPRESSION_STATEMENT,
     ND_ASSIGNMENT_EXPRESSION,
     ND_ILLEGAL,
+    // struct定義の中の子たち
     ND_STRUCT_DECLARATION,
+    // structの型定義そのもの
+    ND_STRUCT_DEFINITION,
 } node_kind_t;
 
 typedef struct array_t array_t;
@@ -161,7 +164,7 @@ struct node_t {
 
         struct {
             // おかしい
-            type_t *struct_declaration;
+            // type_t *struct_declaration;
             decl_list_t *decls;
         } declaration;
 
@@ -210,6 +213,8 @@ struct type_t {
         struct {
             node_t *ident_opt;
             node_t *struct_declaration_list;
+            // 苦肉の策
+            bool is_definition;
         } struct_or_union_specifier;
     } share;
 };
