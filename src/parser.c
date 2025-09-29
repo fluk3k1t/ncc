@@ -2,42 +2,46 @@
 
 #include <stdio.h>
 #include "../inc/tokenizer.h"
+#include "../inc/pretty.h"
 
 token_t *__cur = NULL;
 token_t *__backtrack = NULL;
 token_t *__context_stack[256] = {NULL};
 int __context_stack_depth = 0;
 
-node_t *parse(token_t *token) {
+node_list_t *parse(token_t *token) {
     __cur = token;
     __backtrack = __cur;
 
-    node_t *exd = _external_declaration();
+    node_list_t *head = NULL;
+    node_list_t **tail = &head;
+
+
+    node_t *exd;
+    while ((exd = _external_declaration())) {
+        node_list_t *ns = (node_list_t *)calloc(1, sizeof(node_list_t));
+        ns->self = exd;
+        *tail = ns;
+        tail = &ns->next;
+    }
     
-    return exd;
+    return head;
 }
 
 node_t *_external_declaration() {
     node_t *fd = TRY(_function_definition());
     if (fd) return fd;
 
-    // PANIC("koko");
-
-    node_t *decl = _declaration();
+    node_t *decl = TRY(_declaration());
     if (decl) return decl;
     
-    PANIC("no matching syntax!\n");
+    FAIL("no matching syntax!\n");
 }
 
 node_t *_function_definition() {
-    type_t *tspecs = _declaration_specifiers();
-    if (!tspecs) FAIL("toplevel");
-
-    decl_t *decl = _declarator(tspecs);
-    if (!decl) { FAIL("EXPECTed '_declarator()'\n"); }
-
-    node_t *cs = _compound_statement();
-    if (!cs) FAIL("expected compound statement\n");
+    type_t *tspecs = MUST(_declaration_specifiers());
+    decl_t *decl = MUST(_declarator(tspecs));
+    node_t *cs = MUST(_compound_statement());
 
     node_t *fd = new_node(ND_FUNCTION_DEFINITION);
     fd->share.function_difinition.decl = decl;
@@ -123,15 +127,13 @@ node_t *additive_expression() {
 
 node_t *_assignment_expression() {
     // TODO: 本来はunary-expression
-    node_t *exp = additive_expression();
-    if (!exp) return NULL;
+    node_t *exp = MUST(additive_expression());
 
     // TODO: assignment_expressionがただのexpressionを返してしまっていいのか
     char *aop = _assignment_operator();
     if (!aop) return exp;
 
-    node_t *aexp_rec = _assignment_expression();
-    if (!aexp_rec) { PANIC("expected assignment expression \n"); }
+    node_t *aexp_rec = MUST(_assignment_expression());
 
     node_t *aexp = new_node(ND_ASSIGNMENT_EXPRESSION);
     aexp->share.assignment_expression.unary_expression = exp;
@@ -154,18 +156,16 @@ node_t *expression() {
 }
 
 node_t *_declaration() {
-    type_t *decl_specs = _declaration_specifiers();
-    if (!decl_specs) return NULL;
-
-    // TODO: optionalのハンドリング
-    // TODO: tryのバックトラックそのものの退避が必要な希ガス
+    type_t *decl_specs = MUST(_declaration_specifiers());
     decl_list_t *init_dectr_list_opt = TRY(_init_declarator_list(decl_specs));
-    // if (!init_dectr_list) { return  }
 
     EXPECT(";");
 
     node_t *decl = new_node(ND_DECLARATION);
-    decl->share.declaration.decls = init_dectr_list_opt;
+    if (init_dectr_list_opt) 
+        decl->share.declaration.decls = init_dectr_list_opt;
+    else 
+        decl->share.declaration.struct_declaration = decl_specs;
 
     return decl;
 }
@@ -188,8 +188,7 @@ decl_list_t *_init_declarator_list(type_t *base) {
     decl_list_t *head = cur;
 
     do {
-        decl_t *i = _init_declarator(base);
-        if (!i) { FAIL("EXPECTed init-declarator"); }
+        decl_t *i = MUST(_init_declarator(base));
         decl_list_t *next = (decl_list_t *)calloc(1, sizeof(decl_list_t));
         next->self = i;
         cur->next = next;
@@ -200,8 +199,7 @@ decl_list_t *_init_declarator_list(type_t *base) {
 }
 
 decl_t *_init_declarator(type_t *base) {
-    decl_t *dectr = _declarator(base);
-    if (!dectr) return NULL;
+    decl_t *dectr = MUST(_declarator(base));
 
     if (consume("=")) {
         node_t *init = initializer();
@@ -231,7 +229,6 @@ type_t *_type_specifier() {
 }
 
 type_t *_struct_or_union_specifier() {
-    token_t *_s = __cur;
     type_t *st = _struct_or_union();
     if (!st) return st;
 
@@ -264,7 +261,7 @@ node_t *_struct_declaration() {
     type_list_t *specs = _specifier_qualifier_list();
     if (!specs) return NULL;
 
-    decl_list_t *decls = _struct_declarator_list();
+    decl_list_t *decls = _struct_declarator_list(specs);
 
     EXPECT(";");
 
@@ -294,8 +291,8 @@ type_list_t *_specifier_qualifier_list() {
 }
 
 // struct-declarator-list := struct-declarator ("," struct-declarator)*
-decl_list_t *_struct_declarator_list() {
-    decl_t *decl = _struct_declarator();
+decl_list_t *_struct_declarator_list(type_t *base) {
+    decl_t *decl = _struct_declarator(base);
     if (!decl) return NULL;
     
     decl_list_t *decls = (decl_list_t *)calloc(1, sizeof(decl_list_t));
@@ -306,8 +303,8 @@ decl_list_t *_struct_declarator_list() {
 
 // struct-declarator := declarator
 //                    | declarator? : constant-expression
-decl_t *_struct_declarator() {
-    return _declarator(NULL);
+decl_t *_struct_declarator(type_t *base) {
+    return _declarator(base);
 }
 
 // struct-or-union := "struct" | "union"
@@ -337,9 +334,7 @@ decl_t *_direct_declarator(type_t *base) {
 
     node_t *ident = identifier();
 
-    printf("ident\n");
     if (!ident) {
-        printf("no %s\n", __cur->str);
         if (consume("(")) {
             decl_t *dectr = _declarator(NULL);
             if (!dectr) {
@@ -355,7 +350,9 @@ decl_t *_direct_declarator(type_t *base) {
             // abstに委譲
             return NULL;
         }
-    }else printf("aru\n");
+    } else {
+
+    }
 
     while (1) {
         if (consume("[")) {
@@ -582,17 +579,19 @@ node_t *_statement() {
 
 node_t *_compound_statement() {
     if (consume("{")) {
-        node_list_t *bs = _block_item_list();
+        node_t *bs = _block_item_list();
         EXPECT("}");
         node_t *cps = new_node(ND_COMPOUND_STATEMENT);
         cps->share.compound_statement.block_item_list_opt = bs;
+        show_node(cps);
+        exit(1);
         return cps;
     } else {
         return NULL;
     }
 }
 
-node_list_t *_block_item_list() {
+node_t *_block_item_list() {
     node_list_t *cur = (node_list_t *)calloc(1, sizeof(node_list_t));
     node_list_t *head = cur;
 
@@ -607,7 +606,11 @@ node_list_t *_block_item_list() {
         cur = next;
     }
 
-    return head->next;
+
+    node_t *bil = new_node(ND_BLOCK_ITEM_LIST);
+    bil->share.block_item_list.list = head->next;
+
+    return bil;
 }
 
 node_t *_block_item() {
@@ -646,9 +649,7 @@ bool consume(char *op) {
     if (!__cur) PANIC("current token is null\n");
 
     if (__cur->kind == TK_RESERVED || __cur->kind == TK_IDENT) {
-        // printf("compare %s to %.*s\n", op, __cur->len, __cur->str);
         if (__cur->len == strlen(op) && strncmp(__cur->str, op, __cur->len) == 0) {
-            // printf("match\n");
             __cur = __cur->next;
             return true;
         }
@@ -672,8 +673,6 @@ bool peek(char *op) {
 bool type(char *c) {
     if (!__cur) PANIC("current token is null\n");
 
-    // printf("compare %s to %s\n", c, __cur->str);
-
     if (__cur->kind == TK_TYPE) {
         if (__cur->len == strlen(c) && strncmp(__cur->str, c, __cur->len) == 0) {
             __cur = __cur->next;
@@ -684,21 +683,8 @@ bool type(char *c) {
     return false;
 }
 
-void expect(char *op) {
-    if (__cur->kind == TK_RESERVED || __cur->kind == TK_IDENT) {
-        if (__cur->len == strlen(op) && strncmp(__cur->str, op, __cur->len) == 0) {
-            __cur = __cur->next;
-            return;
-        }
-    }
-
-    printf("EXPECT '%s' but '%.*s'\n", op, __cur->len, __cur->str);
-    exit(1);
-}
-
 char *peek_types(char *names[], int len) {
     for (int i = 0; i < len; i++) {
-        // printf("compare '%s' to '%.*s'\n", names[i], cur->len, cur->str);
         if (peek_type(names[i])) {
             return names[i];
         }
@@ -733,32 +719,9 @@ node_t *new_node(node_kind_t kind) {
     return node;
 }
 
-// パースが失敗してもトークンを消費しないパーサにtryは必要ない
-node_t *try_(node_t *(*p)()) {
-    token_t *___backtrack = __cur;
-    node_t *res = p();
-
-    if (res) {
-        return res;
-    } else {
-        // printf("try fial\n");
-        __cur = ___backtrack;
-        return NULL;
-    }
-}
-
 type_t *new_type(type_kind_t kind) {
     type_t *type = (type_t *)calloc(1, sizeof(type_t));
     type->kind = kind;
 
     return type;
-}
-
-void *must(void *(*p)(), char *p_name) {
-    void *res = p();
-    if (!res) {
-        PANIC("%s: failed\n", p_name);
-    }
-
-    return res;
 }

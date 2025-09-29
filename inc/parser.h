@@ -52,7 +52,7 @@ extern int __context_stack_depth;
 #define MUST(p)                                                             \
     ({                                                                      \
         __auto_type _v = (p);                                               \
-        if (!_v) FAIL("expected " #p "\n");                                \
+        if (!_v) FAIL("expected '" #p "'\n");                                \
         _v;                                                                 \
     })                                                                      
 
@@ -143,7 +143,7 @@ struct node_t {
 
     union {
         struct {
-            node_list_t *block_item_list_opt;
+            node_t *block_item_list_opt;
         } compound_statement;
 
         struct {
@@ -151,11 +151,17 @@ struct node_t {
         } expression_statement;
 
         struct {
+            node_list_t *list;
+        } block_item_list;
+
+        struct {
             node_t *unary_expression, *rec;
             char *assignment_operator;
         } assignment_expression;
 
         struct {
+            // おかしい
+            type_t *struct_declaration;
             decl_list_t *decls;
         } declaration;
 
@@ -232,14 +238,14 @@ type_t *_struct_or_union_specifier();
 node_t *_struct_declaration_list();
 node_t *_struct_declaration();
 type_list_t *_specifier_qualifier_list();
-decl_list_t *_struct_declarator_list();
-decl_t *_struct_declarator();
+decl_list_t *_struct_declarator_list(type_t *base);
+decl_t *_struct_declarator(type_t *base);
 type_t *_struct_or_union();
 type_t *_declaration_specifiers();
 decl_list_t *_init_declarator_list(type_t *base);
 decl_t *_init_declarator(type_t *base);
 
-node_t *parse(token_t *token);
+node_list_t *parse(token_t *token);
 node_t *_external_declaration();
 node_t *_function_definition();
 node_t *identifier();
@@ -253,7 +259,7 @@ node_t *expression();
 node_t *initializer();
 node_t *_statement();
 node_t *_compound_statement();
-node_list_t *_block_item_list();
+node_t *_block_item_list();
 node_t *_block_item();
 node_t *_expression_statement();
 decl_list_t *_parameter_list();
@@ -268,11 +274,8 @@ char *oneof(char **ones, int len);
 bool consume(char *op);
 bool peek(char *op);
 bool type(char *c);
-void expect(char *op);
 bool peek_type(char *name);
 char *peek_types(char *names[], int len);
-node_t *try_(node_t *(*p)());
-void *must(void *(*p)(), char *p_name);
 type_t *new_type(type_kind_t kind);
 
 

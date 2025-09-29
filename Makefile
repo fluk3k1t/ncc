@@ -6,7 +6,6 @@ TEST_DIR    := test
 INC_DIR     := inc
 SRC_DIR     := src
 OBJ_DIR     := $(BUILD_DIR)
-# OBJ_DIR_DEBUG := $(BUILD_DIR)/debug
 TEST_OBJDIR := $(BUILD_DIR)/test
 GTEST_DIR   := gtest
 

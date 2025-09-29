@@ -14,8 +14,7 @@ void show_node(node_t *node) {
 
 void show_node_with_indent(node_t *node, int level) {
     if (!node) {
-        printf("show_node_with_indent: node is NULL\n");
-        exit(1);
+        PANIC("node is NULL\n");
     }
 
     switch (node->kind) {
@@ -47,13 +46,9 @@ void show_node_with_indent(node_t *node, int level) {
             break;
         case ND_STRUCT_DECLARATION:
             put_indent(level); printf("ND_STRUCT_DECLARATION\n");
+            show_type(node->share.struct_declaration.struct_declarator_list_opt->self->decl);
+            printf("\n");
             break;
-        // case ND_TYPE_SPECIFIER:
-        //     put_indent(level); printf("ND_TYPE_SPECIFIER: '%.*s'\n", node->len, node->str);
-        //     if (node->next) {
-        //         show_node_with_indent(node->next, level);
-        //     }
-        //     break;
         case ND_FUNCTION_DEFINITION: 
             put_indent(level); printf("ND_FUNCTION_DEFINITION: \n");
             put_indent(level + 1); show_type(node->share.function_difinition.decl->decl); printf("\n");
@@ -65,7 +60,7 @@ void show_node_with_indent(node_t *node, int level) {
                 if (cur->self->ident) {
                     put_indent(level + 1); printf("%.*s: ", cur->self->ident->len, cur->self->ident->str);
                 } else {
-                    PANIC("EXPECTed ident\n");
+                    PANIC("expected ident\n");
                 }
                 show_type(cur->self->decl);
                 if (cur->self->init) {
@@ -74,12 +69,14 @@ void show_node_with_indent(node_t *node, int level) {
                 }
                 printf("\n");
             }
+            if (node->share.declaration.struct_declaration) {
+                put_indent(level + 1); show_type(node->share.declaration.struct_declaration);
+                printf("\n");
+            }
             break;
         case ND_COMPOUND_STATEMENT:
             put_indent(level); printf("ND_COMPOUND_STATEMENT: \n");
-            for (node_list_t *cur = node->share.compound_statement.block_item_list_opt; cur; cur = cur->next) {
-                show_node_with_indent(cur->self, level + 1);
-            }
+            show_node_with_indent(node->share.compound_statement.block_item_list_opt, level + 1);
             break;
         case ND_ASSIGNMENT_EXPRESSION:
             put_indent(level); printf("ND_ASSIGNMENT_EXPRESSION: \n");
@@ -87,57 +84,26 @@ void show_node_with_indent(node_t *node, int level) {
             put_indent(level + 1); printf("op: %s\n", node->share.assignment_expression.assignment_operator);
             show_node_with_indent(node->share.assignment_expression.rec, level + 1);
             break;
-        // case ND_DECLARATOR:
-        //     put_indent(level); printf("ND_DECLARATOR: \n");
-        //     if (node->share.declarator.ptr_opt) {
-        //         show_node_with_indent(node->share.declarator.ptr_opt, level + 1);
-        //     }
-        //     show_node_with_indent(node->share.declarator.direct_decl, level + 1);
-        //     break;
-        // case ND_DIRECT_DECLARATOR:
-        //     put_indent(level); printf("ND_DIRECT_DECLARATOR:\n");
-        //     if (node->share.direct_declarator.ident) {
-        //         put_indent(level + 1); printf("Identifier: \n");
-        //         show_node_with_indent(node->share.direct_declarator.ident, level + 2);
-        //     } else if (node->share.direct_declarator.braced_declarator) {
-        //         put_indent(level + 1); printf("Braced: \n");
-        //         show_node_with_indent(node->share.direct_declarator.braced_declarator, level + 2);
-        //     }
-
-        //     if (node->share.direct_declarator.array) {
-        //         put_indent(level + 1); printf("Array: \n");
-        //         show_array_with_indent(node->share.direct_declarator.array, level + 2);
-        //     }
-        //     // TODO: show marr as ini 
-        //     break;
-        // case ND_INIT_DECLARATOR:
-        //     put_indent(level); printf("ND_INIT_DECLARATOR:\n");
-        //     show_node_with_indent(node->lhs, level + 1);
-        //     if (node->rhs) {
-        //         show_node_with_indent(node->rhs, level + 1);
-        //     } else {
-        //         put_indent(level + 1); printf("initializer: None\n");
-        //     }
-        //     break;
-        // case ND_POINTER:
-        //     put_indent(level); printf("ND_POINTER: *\n");
-        //     if (node->share.pointer.tqs_opt) {
-        //         put_indent(level + 1); printf("type qualifier list optional, but not show yet\n");
-        //     } 
-        //     if (node->share.pointer.ptr_opt) {
-        //         show_node_with_indent(node->share.pointer.ptr_opt, level + 1);
-        //     }
-        //     break;
+        case ND_BLOCK_ITEM_LIST:
+            printf("BLOCK_ITEM_LIST: \n");
+            for (node_list_t *cur = node->share.block_item_list.list; cur; cur = cur->next) {
+                show_node_with_indent(cur->self, level + 1);
+            }
+            break;
+        case ND_EXPRESSION_STATEMENT:
+            printf("ND_EXPRESSION_STATEMENT\n");
+            if (node->share.expression_statement.expression_opt)
+                show_node_with_indent(node->share.expression_statement.expression_opt, level + 1);
+            break;
         default:
-            printf("default");
+            printf("default %d\n", node->kind);
             break;
     }
 }
 
 void show_type(type_t *t) {
     if (!t) {
-        printf("show_type: NULL\n");
-        exit(1);
+        PANIC("show_type: NULL\n");
     }
 
     switch (t->kind) {
@@ -171,8 +137,9 @@ void show_type(type_t *t) {
         case STRUCT:
             printf("struct ");
             if (t->share.struct_or_union_specifier.ident_opt) {
-                printf("%.*s", t->share.struct_or_union_specifier.ident_opt->len, t->share.struct_or_union_specifier.ident_opt->str);
+                printf("%.*s\n", t->share.struct_or_union_specifier.ident_opt->len, t->share.struct_or_union_specifier.ident_opt->str);
             }
+            show_node(t->share.struct_or_union_specifier.struct_declaration_list);
             break;
         default:
             printf("default\n");
