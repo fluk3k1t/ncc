@@ -69,10 +69,10 @@ void show_node_with_indent(node_t *node, int level) {
                 }
                 printf("\n");
             }
-            if (node->share.declaration.struct_declaration) {
-                put_indent(level + 1); show_type(node->share.declaration.struct_declaration);
-                printf("\n");
-            }
+            // if (node->share.declaration.struct_declaration) {
+            //     put_indent(level + 1); show_type(node->share.declaration.struct_declaration);
+            //     printf("\n");
+            // }
             break;
         case ND_COMPOUND_STATEMENT:
             put_indent(level); printf("ND_COMPOUND_STATEMENT: \n");

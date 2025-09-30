@@ -67,6 +67,60 @@ extern int __context_stack_depth;
 //         _v;                                                     \
 //     })
 
+#define LIST_TYPE(T) __list_##T##__
+
+#define LIST(T) __list_##T##__ *
+
+#define LIST_DECLARE(T) \
+    typedef struct LIST_TYPE(T) LIST_TYPE(T);   \
+    struct LIST_TYPE(T) {    \
+        struct LIST_TYPE(T) *next; \
+        T inner;                    \
+    };     \
+    void __list_##T##__push(LIST(T) head, T a); \
+    T __list_##T##__pop(LIST(T) head); \
+    T __list_##T##__pop_front(LIST(T) *head);
+
+#define LIST_DEFINE(T)  \
+    void __list_##T##__push(LIST(T) head, T a) {   \
+        LIST_TYPE(T) *n = (LIST_TYPE(T) *)calloc(1, sizeof(LIST_TYPE(T)));    \
+        n->inner = a;   \
+        LIST(T) tail = head;    \
+        for (; tail->next; tail = tail->next);  \
+        tail->next = n; \
+    }   \
+    T __list_##T##__pop(LIST(T) head) { \
+        LIST(T) tail = head;    \
+        for (; tail->next; tail = tail->next);  \
+        T ret = tail->inner;    \
+        LIST(T) cursor = head;  \
+        for (; cursor->next != tail; cursor = cursor->next);    \
+        cursor->next = NULL;    \
+        return ret; \
+    }   \
+    T __list_##T##__pop_front(LIST(T) *head) {   \
+        if (head == NULL) {    \
+            printf("pop_front: you' ve tried to pop empty list\n"); \
+            exit(1);    \
+        }   \
+        T ret = (*head)->next->inner;   \
+        *head = (*head)->next;  \
+        return ret;\
+    }
+
+#define LIST_FOREACH(T, l, i)  \
+    for (LIST(T) i = l->next; i; i = i->next)
+
+
+#define LIST_NEW(l) (LIST(T))calloc(1, sizeof(LIST_TYPE(T)))
+#define LIST_PUSH(T, l, a) __list_##T##__push(l, a)
+#define LIST_POP(T, l) __list_##T##__pop(l)
+#define LIST_POP_FRONT(T, l) __list_##T##__pop_front(&l)
+
+// #define 
+
+LIST_DECLARE(int)
+
 typedef enum {
     ND_ADD,
     ND_SUB,
@@ -136,6 +190,20 @@ typedef struct decl_t decl_t;
 typedef struct decl_list_t decl_list_t;
 typedef struct type_t type_t;
 typedef struct type_list_t type_list_t;
+
+typedef struct {
+
+} Type;
+
+typedef struct {
+    char *str;
+    int len;
+} Identifier;
+
+typedef struct {
+    Type *type;
+    Identifier *ident;
+} Declaration;
 
 struct node_t {
     node_t *next;

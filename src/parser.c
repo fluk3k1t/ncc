@@ -9,6 +9,8 @@ token_t *__backtrack = NULL;
 token_t *__context_stack[256] = {NULL};
 int __context_stack_depth = 0;
 
+LIST_DEFINE(int)
+
 node_list_t *parse(token_t *token) {
     __cur = token;
     __backtrack = __cur;
