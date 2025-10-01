@@ -7,7 +7,7 @@
 #include "../inc/list.h"
 
 int main(int argc, char *argv[]) {
-    char *code = "*a[]";
+    char *code = "char a";
     
     token_t *token = tokenize(code);
     List(ref(Node)) *tree = parse(token);

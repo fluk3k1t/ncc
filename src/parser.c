@@ -46,8 +46,17 @@ List(ref(node_t)) *parse(token_t *token) {
     //     }
     // }
 
-    Type *t = declarator(NULL);
-    show_type(t);
+    // Type *t = declarator(NULL);
+    // show_type(t);
+
+    VariableDefinition *_variable_definition = declaration();
+
+    List(ref(InitDeclarator)) *_init_declarator_list = _variable_definition->init_declarator_list;
+
+    list_foreach(ref(InitDeclarator), _init_declarator_list, itr) {
+        Type *type = itr->data->declarator;
+        show_type(type);
+    }
 
     // return head;
     return NULL;
@@ -220,16 +229,25 @@ node_t *_declaration() {
 }
 
 VariableDefinition *declaration() {
-    List(ref(Specifier)) *_declaration_specifiers = declaration_specifiers();
-    if (!_declaration_specifiers) FAIL("");
+    List(ref(Specifier)) *_declaration_specifiers = TRY(declaration_specifiers());
 
-    List(ref(InitDeclarator)) *init_declarator_list_opt = init_declarator_list(NULL);
+    List(ref(InitDeclarator)) *init_declarator_list_opt = init_declarator_list(from_specifiers(_declaration_specifiers));
 
-    return NULL;
+    VariableDefinition *_variable_definition = (VariableDefinition *)calloc(1, sizeof(VariableDefinition));
+    
+    _variable_definition->init_declarator_list = init_declarator_list_opt;
+
+    return _variable_definition;
 }
 
+// TODO: Many0 pattern?
 List(ref(Specifier)) *declaration_specifiers() {
+    TypeSpecifier *ts = TRY(type_specifier());
+    if (!ts) FAIL("");
+
     List(ref(Specifier)) *specs = list_new(ref(Specifier));
+    
+    list_push(ref(Specifier), specs, new_specifier(*ts));
     // list_push(pure(Specifier), specs, )
     while (1) {
         TypeSpecifier *ts = TRY(type_specifier());
@@ -246,7 +264,7 @@ List(ref(InitDeclarator)) *init_declarator_list(Type *base) {
 
 // init-declarator := declarator ("=" initializer)?
 InitDeclarator *init_declarator(Type *base) {
-    Type *_declarator = TRY(declarator());
+    Type *_declarator = TRY(declarator(base));
     if (!_declarator) FAIL("");
 
     InitDeclarator *_init_declarator = (InitDeclarator *)calloc(1, sizeof(InitDeclarator));
@@ -267,16 +285,53 @@ TypeSpecifier *type_specifier() {
     return ts;
 }
 
+Type *from_specifiers(List(ref(Specifier)) *specifiers) {
+    // TODO: listのempty check
+    Specifier *base_specifier = list_pop(ref(Specifier), specifiers);
+    if (!base_specifier) PANIC("unreachable");
+    Type *base = from_specifier(base_specifier);
+
+    // list_foreach(ref(Specifier), specifiers, itr) {
+
+    // }
+
+    return base;
+}
+
+Type *from_specifier(Specifier *from) {
+    switch (from->kind) {
+        case SpTypeSpecifier:
+            return from_type_specifier(from->share.type_specifier);
+        default:
+            PANIC("unreachable");
+    }
+}
+
+Type *from_type_specifier(TypeSpecifier type_specifier) {
+    switch (type_specifier) {
+        case TsChar:
+            return new_type(TkChar);
+        // case TsVoid:
+        //     return new_type(TkVoid);
+        default:
+            PANIC("unreachable");
+    }
+}
+
 // void *init_declarator() {
 
 // }
 
 Type *declarator(Type *base) {
     List(ref(Pointer)) *ptr_opt = pointer(base);
-    Type *_declarator = TRY(direct_declarator(base));
-    if (!_declarator) FAIL("");
+    // PANIC("here");
+    Type *_direct_declarator = TRY(direct_declarator(base));
+    show_type(_direct_declarator);
+    PANIC("here");
+    if (!_direct_declarator) FAIL("");
+    
 
-    return _declarator;
+    return _direct_declarator;
 }
 
 // direct_declarator := (identifier | "(" declarator ")") direct_declarator_partial*
@@ -286,7 +341,7 @@ Type *direct_declarator(Type *base) {
     if (_identifier) {
 
     } else {
-        PANIC("todo");
+        // PANIC("todo");
     }
 
     List(ref(Type)) *types = TRY(Many1(Type, direct_declarator_partial()));

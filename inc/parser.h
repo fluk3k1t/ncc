@@ -82,6 +82,19 @@ extern int __context_stack_depth;
     _es;    \
 })
 
+#define Many0(T, p) _Many0(ref(T), p)
+
+#define _Many0(T, p)    \
+({  \
+    _LIST(T) *_es = _LIST_NEW(T); \
+    while (1) {    \
+        __auto_type _v = (TRY(p));   \
+        if (_v) _LIST_PUSH(T, _es, _v);   \
+        else break; \ 
+    };    \
+    _es;    \
+})
+
 typedef enum {
     ND_ADD,
     ND_SUB,
@@ -199,8 +212,7 @@ struct Type {
 };
 
 struct VariableDefinition {
-    // declaration_specifiers;
-    // init_declarator_list
+    List(ref(InitDeclarator)) *init_declarator_list;
 };
 
 struct DeclarationSpecifiers {
@@ -355,10 +367,14 @@ type_list_t *_specifier_qualifier_list();
 decl_list_t *_struct_declarator_list(type_t *base);
 decl_t *_struct_declarator(type_t *base);
 type_t *_struct_or_union();
+VariableDefinition *declaration();
 List(ref(Specifier)) *declaration_specifiers();
 List(ref(InitDeclarator)) *init_declarator_list(Type *base);
 InitDeclarator *init_declarator(Type *base);
 TypeSpecifier *type_specifier();
+Type *from_specifiers(List(ref(Specifier)) *specifiers);
+Type *from_specifier(Specifier *from);
+Type *from_type_specifier(TypeSpecifier type_specifier);
 List(ref(Pointer)) *pointer(Type *base);
 Pointer *pointer_helper();
 List(ref(TypeQualifier)) *type_qualifier_list();
