@@ -1,7 +1,19 @@
 #ifndef __H_PARSER_
 #define __H_PARSER_
 
+#include "list.h"
 #include "tokenizer.h"
+#include <stddef.h>
+
+// パーサの方針はあくまで構文をデータ構造に変換することであって、生成コードの必要な情報等々を埋め込まないようにする
+// そっちのほうが構成が美しいし、問題個所を切り分けやすいからデバッグもしやすいはず。
+// コード量は増えるし、2ステージ間の連携を考える複雑さはあるけど。どっちがいいのかというと、
+// 9ccみたいなシンプルな美しさも魅力的だけど、俺はそういう職人芸的なプログラミングに終始し過ぎたくないという
+// 思いがあるので。つまりただの好みです
+// 例えばdeclarationにおいてstructが定義か宣言かを判定するのではなくてsemanticsに移譲する
+// とにかくEBNFを愚直に生成すればよい
+// やっぱこの方針なしｗ
+// 工数が多すぎてめんどくさいしＣ言語だし
 
 extern token_t *__cur, *__backtrack;
 extern token_t *__context_stack[256];
@@ -17,17 +29,15 @@ extern int __context_stack_depth;
         exit(1);                                                            \
     } while (0)
 
-
-
-    #define TRY(p)  \
-    ({                                          \
-        __context_stack[__context_stack_depth++]= __backtrack; \
-        __backtrack = __cur;                       \
-        __auto_type _res = (p);                 \
-        if (!_res) __cur = __backtrack;                 \
-        __backtrack = __context_stack[--__context_stack_depth]; \
-        _res;                                    \
-    })
+#define TRY(p)  \
+({                                          \
+    __context_stack[__context_stack_depth++]= __backtrack; \
+    __backtrack = __cur;                       \
+    __auto_type _res = (p);                 \
+    if (!_res) __cur = __backtrack;                 \
+    __backtrack = __context_stack[--__context_stack_depth]; \
+    _res;                                    \
+})
 
 #define FAIL(fmt, ...)                                                     \
     do {                                                                    \
@@ -56,70 +66,21 @@ extern int __context_stack_depth;
         _v;                                                                 \
     })                                                                      
 
-// #define TRY(expr) \
-//     ({                                                          \
-//         token_t *_t = __cur;                                      \
-//         __auto_type _v = (expr);                                \
-//         if (!_v) {                                              \
-//             if (_t != __cur) PANIC("token not recoverd!\n");      \
-//             return NULL;                                        \
-//         }                                                       \
-//         _v;                                                     \
-//     })
+#define Many1(T, p) _Many1(ref(T), p)
 
-#define LIST_TYPE(T) __list_##T##__
-
-#define LIST(T) __list_##T##__ *
-
-#define LIST_DECLARE(T) \
-    typedef struct LIST_TYPE(T) LIST_TYPE(T);   \
-    struct LIST_TYPE(T) {    \
-        struct LIST_TYPE(T) *next; \
-        T inner;                    \
-    };     \
-    void __list_##T##__push(LIST(T) head, T a); \
-    T __list_##T##__pop(LIST(T) head); \
-    T __list_##T##__pop_front(LIST(T) *head);
-
-#define LIST_DEFINE(T)  \
-    void __list_##T##__push(LIST(T) head, T a) {   \
-        LIST_TYPE(T) *n = (LIST_TYPE(T) *)calloc(1, sizeof(LIST_TYPE(T)));    \
-        n->inner = a;   \
-        LIST(T) tail = head;    \
-        for (; tail->next; tail = tail->next);  \
-        tail->next = n; \
-    }   \
-    T __list_##T##__pop(LIST(T) head) { \
-        LIST(T) tail = head;    \
-        for (; tail->next; tail = tail->next);  \
-        T ret = tail->inner;    \
-        LIST(T) cursor = head;  \
-        for (; cursor->next != tail; cursor = cursor->next);    \
-        cursor->next = NULL;    \
-        return ret; \
-    }   \
-    T __list_##T##__pop_front(LIST(T) *head) {   \
-        if (head == NULL) {    \
-            printf("pop_front: you' ve tried to pop empty list\n"); \
-            exit(1);    \
-        }   \
-        T ret = (*head)->next->inner;   \
-        *head = (*head)->next;  \
-        return ret;\
-    }
-
-#define LIST_FOREACH(T, l, i)  \
-    for (LIST(T) i = l->next; i; i = i->next)
-
-
-#define LIST_NEW(l) (LIST(T))calloc(1, sizeof(LIST_TYPE(T)))
-#define LIST_PUSH(T, l, a) __list_##T##__push(l, a)
-#define LIST_POP(T, l) __list_##T##__pop(l)
-#define LIST_POP_FRONT(T, l) __list_##T##__pop_front(&l)
-
-// #define 
-
-LIST_DECLARE(int)
+#define _Many1(T, p) \
+({  \
+    __auto_type _e = (TRY(p));   \
+    if (!_e) FAIL("");  \
+    _LIST(T) *_es = _LIST_NEW(T); \
+    _LIST_PUSH(T, _es, _e); \
+    do {    \
+        __auto_type _v = (TRY(p));   \
+        if (_v) _LIST_PUSH(T, _es, _v);   \
+        else break; \ 
+    } while (1);    \
+    _es;    \
+})
 
 typedef enum {
     ND_ADD,
@@ -178,32 +139,83 @@ typedef enum {
     ND_STRUCT_DEFINITION,
 } node_kind_t;
 
-typedef struct array_t array_t;
-struct array_t {
-    array_t *next;
-    int len;
-};
+typedef enum {
+    Dummy,
+} NodeKind;
+
+typedef enum {
+    TsVoid, TsChar,
+} TypeSpecifier;
+
+typedef enum {
+    TqConst, TqVolatile
+} TypeQualifier;
+DeriveList(ref(TypeQualifier))
+
+typedef struct Node Node;
+
+typedef struct Identifier Identifier;
+
+
+typedef struct VariableDefinition VariableDefinition;
+typedef struct Specifier Specifier;
+DeriveList(ref(Specifier))
+typedef struct InitDeclarator InitDeclarator;
 
 typedef struct node_t node_t;
-typedef struct node_list_t node_list_t;
 typedef struct decl_t decl_t;
 typedef struct decl_list_t decl_list_t;
 typedef struct type_t type_t;
 typedef struct type_list_t type_list_t;
 
-typedef struct {
+DeriveList(ref(node_t))
 
-} Type;
-
-typedef struct {
-    char *str;
-    int len;
-} Identifier;
-
-typedef struct {
-    Type *type;
+DeriveList(ref(Node))
+struct Node {
+    NodeKind kind;
     Identifier *ident;
-} Declaration;
+};
+
+struct VariableDefinition {
+    // declaration_specifiers;
+    // init_declarator_list
+};
+
+struct DeclarationSpecifiers {
+    List(ref(Specifier)) specifiers;
+};
+
+struct Specifier {
+    enum {
+        SpTypeSpecifier
+    } kind;
+
+    union {
+        TypeSpecifier type_specifier;
+    } share;
+};
+
+struct InitDeclarator {
+
+};
+
+#define new_specifier(v) _Generic((v), \
+    TypeSpecifier: ({   \
+        Specifier *s = (Specifier *)calloc(1, sizeof(Specifier));   \
+        s->kind = SpTypeSpecifier;  \
+        s->share.type_specifier = v;    \
+        s;  \
+    })  \
+)
+
+struct Type {
+
+};
+
+struct Identifier {
+    char *str;
+    unsigned int len;
+};
 
 struct node_t {
     node_t *next;
@@ -213,57 +225,52 @@ struct node_t {
     int len, val;
 
     union {
-        struct {
-            node_t *block_item_list_opt;
-        } compound_statement;
+        // struct {
+        //     node_t *block_item_list_opt;
+        // } compound_statement;
 
-        struct {
-            node_t *expression_opt;
-        } expression_statement;
+        // struct {
+        //     node_t *expression_opt;
+        // } expression_statement;
 
-        struct {
-            node_list_t *list;
-        } block_item_list;
+        // struct {
+        //     node_list_t *list;
+        // } block_item_list;
 
-        struct {
-            node_t *unary_expression, *rec;
-            char *assignment_operator;
-        } assignment_expression;
+        // struct {
+        //     node_t *unary_expression, *rec;
+        //     char *assignment_operator;
+        // } assignment_expression;
 
-        struct {
-            // おかしい
-            // type_t *struct_declaration;
-            decl_list_t *decls;
-        } declaration;
+        // struct {
+        //     // おかしい
+        //     // type_t *struct_declaration;
+        //     decl_list_t *decls;
+        // } declaration;
 
-        struct {
-            decl_t *decl;
-            node_t *cs;
-        } function_difinition;
+        // struct {
+        //     decl_t *decl;
+        //     node_t *cs;
+        // } function_difinition;
 
-        struct {
-            type_list_t *specs;
-            decl_list_t *struct_declarator_list_opt;
-        } struct_declaration;
+        // struct {
+        //     type_list_t *specs;
+        //     decl_list_t *struct_declarator_list_opt;
+        // } struct_declaration;
 
-        struct {
-            node_t *ptr_opt, *direct_decl;
-        } declarator;
+        // struct {
+        //     node_t *ptr_opt, *direct_decl;
+        // } declarator;
 
-        struct {
-            node_t *tqs_opt, *ptr_opt;
-        } pointer;
+        // struct {
+        //     node_t *tqs_opt, *ptr_opt;
+        // } pointer;
 
-        struct {
-            node_t *ident, *braced_declarator;
-            array_t *array;
-        } direct_declarator;
+        // struct {
+        //     node_t *ident, *braced_declarator;
+        //     array_t *array;
+        // } direct_declarator;
     } share;
-};
-
-struct node_list_t {
-    node_t *self;
-    node_list_t *next;
 };
 
 typedef enum {
@@ -297,11 +304,6 @@ struct decl_t {
     node_t *ident, *init;
 };
 
-struct decl_list_t {
-    decl_t *self;
-    decl_list_t *next;
-};
-
 node_t *_declaration();
 decl_t *_declarator(type_t *base);
 type_t *_pointer(type_t *base);
@@ -314,11 +316,15 @@ type_list_t *_specifier_qualifier_list();
 decl_list_t *_struct_declarator_list(type_t *base);
 decl_t *_struct_declarator(type_t *base);
 type_t *_struct_or_union();
+List(ref(Specifier)) *declaration_specifiers();
+TypeSpecifier *type_specifier();
+List(ref(TypeQualifier)) *type_qualifier_list();
+TypeQualifier *type_qualifier();
 type_t *_declaration_specifiers();
 decl_list_t *_init_declarator_list(type_t *base);
 decl_t *_init_declarator(type_t *base);
 
-node_list_t *parse(token_t *token);
+List(ref(node_t)) *parse(token_t *token);
 node_t *_external_declaration();
 node_t *_function_definition();
 node_t *identifier();

@@ -9,13 +9,13 @@ FILE *fp;
 env_stack_t env_stack[255];
 int env_stack_depth = 0;
 
-void codegen(const char* output_path, node_list_t *nodes) {
+void codegen(const char* output_path, List(ref(node_t)) *nodes) {
     fp = fopen(output_path, "w");
     if (!fp) PANIC("cannot open file '%s'", output_path);
 
-    for (node_list_t *cur = nodes; cur; cur = cur->next) {
-        _codegen(cur->self);
-    }
+    // for (node_list_t *cur = nodes; cur; cur = cur->next) {
+    //     _codegen(cur->self);
+    // }
 
     fclose(fp);
     fp = NULL;
@@ -35,19 +35,19 @@ void _codegen(node_t *node) {
             break;
         case ND_FUNCTION_DEFINITION:
             TRACE("hello");
-            fprintf(fp, "%.*s:\n", node->share.function_difinition.decl->ident->len, node->share.function_difinition.decl->ident->str);
-            _codegen(node->share.function_difinition.cs);
+            // fprintf(fp, "%.*s:\n", node->share.function_difinition.decl->ident->len, node->share.function_difinition.decl->ident->str);
+            // _codegen(node->share.function_difinition.cs);
             fprintf(fp, "\tret\n");
             break;
         case ND_COMPOUND_STATEMENT:
             TRACE("compound statement\n");
-            _codegen(node->share.compound_statement.block_item_list_opt);
+            // _codegen(node->share.compound_statement.block_item_list_opt);
             break;
         case ND_BLOCK_ITEM_LIST:
             TRACE("block item list\n");
-            for (node_list_t *cur = node->share.block_item_list.list; cur; cur = cur->next) {
-                _codegen(cur->self);
-            }
+            // for (node_list_t *cur = node->share.block_item_list.list; cur; cur = cur->next) {
+            //     _codegen(cur->self);
+            // }
             break;
         case ND_BLOCK:
             TRACE("block\n");
@@ -55,23 +55,23 @@ void _codegen(node_t *node) {
         case ND_DECLARATION:
             TRACE("decl\n");
             // node->share.declaration.
-            for (decl_list_t *cur = node->share.declaration.decls; cur; cur = cur->next) {
-                TRACE("push\n");
-                if (cur->self->decl->share.struct_or_union_specifier.is_definition) {
-                    TRACE("is difinition\n");
+            // for (decl_list_t *cur = node->share.declaration.decls; cur; cur = cur->next) {
+            //     TRACE("push\n");
+            //     if (cur->self->decl->share.struct_or_union_specifier.is_definition) {
+            //         TRACE("is difinition\n");
                     
-                } else {
-                    TRACE("is not difni\n");
-                }
-                env_stack_t *cur_stack = &env_stack[env_stack_depth];
-                env_t *env = (env_t *)calloc(1, sizeof(env_t));
-                env->decl = cur->self;
-                env->allign = cur_stack->allign++;
-                env->size = 0;
-                cur_stack->self[cur_stack->depth++] = env;
-            }
+            //     } else {
+            //         TRACE("is not difni\n");
+            //     }
+            //     env_stack_t *cur_stack = &env_stack[env_stack_depth];
+            //     env_t *env = (env_t *)calloc(1, sizeof(env_t));
+            //     env->decl = cur->self;
+            //     env->allign = cur_stack->allign++;
+            //     env->size = 0;
+            //     cur_stack->self[cur_stack->depth++] = env;
+            // }
 
-            // if (node->share.declaration.struct_declaration) {
+            // // if (node->share.declaration.struct_declaration) {
                 
             // }
             // if (node->share.struct_declaration) {
@@ -79,13 +79,13 @@ void _codegen(node_t *node) {
             // }
             break;
         case ND_EXPRESSION_STATEMENT:
-            if (node->share.expression_statement.expression_opt)
-                _codegen(node->share.expression_statement.expression_opt);
+            // if (node->share.expression_statement.expression_opt)
+            //     _codegen(node->share.expression_statement.expression_opt);
             break;
         case ND_ASSIGNMENT_EXPRESSION:
             TRACE("assignment expression\n");
-            gen_lvar(node->share.assignment_expression.unary_expression);
-            _codegen(node->share.assignment_expression.rec);
+            // gen_lvar(node->share.assignment_expression.unary_expression);
+            // _codegen(node->share.assignment_expression.rec);
             fprintf(fp, "   pop rdi\n");
             fprintf(fp, "   pop rax\n");
             fprintf(fp, "   mov [rax], rdi\n");

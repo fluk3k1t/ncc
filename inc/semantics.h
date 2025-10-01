@@ -3,7 +3,7 @@
 
 #include "parser.h"
 
-void analyze(node_list_t *);
+void analyze(List(ref(Node)) *);
 void _analyze(node_t *);
 
 #endif

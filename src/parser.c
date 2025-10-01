@@ -3,31 +3,45 @@
 #include <stdio.h>
 #include "../inc/tokenizer.h"
 #include "../inc/pretty.h"
+#include "../inc/list.h"
 
 token_t *__cur = NULL;
 token_t *__backtrack = NULL;
 token_t *__context_stack[256] = {NULL};
 int __context_stack_depth = 0;
 
-LIST_DEFINE(int)
+// LIST_DEFINE(ref(node_t))
+DefineList(ref(Specifier))
+DefineList(ref(TypeQualifier))
 
-node_list_t *parse(token_t *token) {
+List(ref(node_t)) *parse(token_t *token) {
     __cur = token;
     __backtrack = __cur;
 
-    node_list_t *head = NULL;
-    node_list_t **tail = &head;
+    // List(ref(node_t)) *head = NULL;
+    // List(ref(node_t)) **tail = &head;
 
 
-    node_t *exd;
-    while ((exd = _external_declaration())) {
-        node_list_t *ns = (node_list_t *)calloc(1, sizeof(node_list_t));
-        ns->self = exd;
-        *tail = ns;
-        tail = &ns->next;
-    }
+    // node_t *exd;
+    // while ((exd = _external_declaration())) {
+    //     // node_list_t *ns = (node_list_t *)calloc(1, sizeof(node_list_t));
+    //     // ns->self = exd;
+    //     // *tail = ns;
+    //     // tail = &ns->next;
+    // }
+
+    // List(ref(Specifier)) *_declaration_specifiers = declaration_specifiers();
+    // list_foreach(ref(Specifier), _declaration_specifiers, dspec) {
+    //     printf("%d\n", dspec->data->share.type_specifier);
+    // }
     
-    return head;
+    List(ref(TypeQualifier)) *_type_qualifiers = type_qualifier_list();
+    list_foreach(ref(TypeQualifier), _type_qualifiers, itr) {
+        printf("f %d\n", *itr->data);
+    }
+
+    // return head;
+    return NULL;
 }
 
 node_t *_external_declaration() {
@@ -46,8 +60,8 @@ node_t *_function_definition() {
     node_t *cs = MUST(_compound_statement());
 
     node_t *fd = new_node(ND_FUNCTION_DEFINITION);
-    fd->share.function_difinition.decl = decl;
-    fd->share.function_difinition.cs = cs;
+    // fd->share.function_difinition.decl = decl;
+    // fd->share.function_difinition.cs = cs;
 
     return fd;
 }
@@ -138,9 +152,9 @@ node_t *_assignment_expression() {
     node_t *aexp_rec = MUST(_assignment_expression());
 
     node_t *aexp = new_node(ND_ASSIGNMENT_EXPRESSION);
-    aexp->share.assignment_expression.unary_expression = exp;
-    aexp->share.assignment_expression.assignment_operator = aop;
-    aexp->share.assignment_expression.rec = aexp_rec;
+    // aexp->share.assignment_expression.unary_expression = exp;
+    // aexp->share.assignment_expression.assignment_operator = aop;
+    // aexp->share.assignment_expression.rec = aexp_rec;
 
     return aexp;
 }
@@ -159,27 +173,91 @@ node_t *expression() {
 
 // declaration := declaration-specifiers init-declarator-list? ";"
 node_t *_declaration() {
-    type_t *decl_specs = MUST(_declaration_specifiers());
-    decl_list_t *init_dectr_list_opt = TRY(_init_declarator_list(decl_specs));
+    // type_t *decl_specs = MUST(_declaration_specifiers());
+    // decl_list_t *init_dectr_list_opt = TRY(_init_declarator_list(decl_specs));
 
-    EXPECT(";");
+    // EXPECT(";");
 
-    node_t *decl = new_node(ND_DECLARATION);
-    if (init_dectr_list_opt) 
-        decl->share.declaration.decls = init_dectr_list_opt;
-    else {
-        init_dectr_list_opt = (decl_list_t *)calloc(1, sizeof(decl_list_t));
-        decl_t *d = (decl_t *)calloc(1, sizeof(decl_t));
-        d->decl = decl_specs;
-        init_dectr_list_opt->self = d;
-        decl->share.declaration.decls = init_dectr_list_opt;
-    }
-    // if (decl_specs->share.struct_or_union_specifier.is_definition) {
-    //     node_t *deff = new_node(ND_STRUCT_DEFINITION);
-    //     deff->
+    // node_t *decl = new_node(ND_DECLARATION);
+    // if (init_dectr_list_opt) {
+    //     // decl->share.declaration.decls = init_dectr_list_opt;
+    // } else {
+    //     // init_dectr_list_opt = (decl_list_t *)calloc(1, sizeof(decl_list_t));
+    //     // decl_t *d = (decl_t *)calloc(1, sizeof(decl_t));
+    //     // d->decl = decl_specs;
+    //     // init_dectr_list_opt->self = d;
+    //     // decl->share.declaration.decls = init_dectr_list_opt;
     // }
+    // // if (decl_specs->share.struct_or_union_specifier.is_definition) {
+    // //     node_t *deff = new_node(ND_STRUCT_DEFINITION);
+    // //     deff->
+    // // }
 
-    return decl;
+    // return decl;
+
+
+    return NULL;
+}
+
+VariableDefinition *declaration() {
+    List(ref(Specifier)) *_declaration_specifiers = declaration_specifiers();
+    if (!_declaration_specifiers) FAIL("");
+
+
+
+    return NULL;
+}
+
+List(ref(Specifier)) *declaration_specifiers() {
+    List(ref(Specifier)) *specs = list_new(ref(Specifier));
+    // list_push(pure(Specifier), specs, )
+    while (1) {
+        TypeSpecifier *ts = TRY(type_specifier());
+        if (ts) list_push(ref(Specifier), specs, new_specifier(*ts));
+        else break;
+    }
+
+    return specs;
+}
+
+TypeSpecifier *type_specifier() {
+    TypeSpecifier *ts = (TypeSpecifier *)calloc(1, sizeof(TypeSpecifier));
+
+    if      (type("void"))  *ts = TsVoid;
+    else if (type("char"))  *ts = TsChar;
+    else                       FAIL("expected some type");
+
+    return ts;
+}
+
+// void *init_declarator() {
+
+// }
+
+// void *declarator() {
+
+// }
+
+// void *pointer() {
+
+// }
+
+// void *type_qualifier_list() {
+
+// }
+
+List(ref(TypeQualifier)) *type_qualifier_list() {
+    return Many1(TypeQualifier, type_qualifier());
+}
+
+TypeQualifier *type_qualifier() {
+    TypeQualifier *type_qualifier = (TypeQualifier *)calloc(1, sizeof(TypeQualifier));
+    
+    if (consume("const")) *type_qualifier = TqConst;
+    else if (consume("volatile")) *type_qualifier = TqVolatile;
+    else FAIL("");
+
+    return type_qualifier;
 }
 
 type_t *_declaration_specifiers() {
@@ -196,18 +274,19 @@ type_t *_declaration_specifiers() {
 }
 
 decl_list_t *_init_declarator_list(type_t *base) {
-    decl_list_t *cur = (decl_list_t *)calloc(1, sizeof(decl_list_t));
-    decl_list_t *head = cur;
+    // decl_list_t *cur = (decl_list_t *)calloc(1, sizeof(decl_list_t));
+    // decl_list_t *head = cur;
 
     do {
-        decl_t *i = MUST(_init_declarator(base));
-        decl_list_t *next = (decl_list_t *)calloc(1, sizeof(decl_list_t));
-        next->self = i;
-        cur->next = next;
-        cur = next;
+        // decl_t *i = MUST(_init_declarator(base));
+        // decl_list_t *next = (decl_list_t *)calloc(1, sizeof(decl_list_t));
+        // next->self = i;
+        // cur->next = next;
+        // cur = next;
     } while (consume(","));
 
-    return head->next;
+    // return head->next;
+    return NULL;
 }
 
 decl_t *_init_declarator(type_t *base) {
@@ -258,17 +337,17 @@ type_t *_struct_or_union_specifier() {
 
         EXPECT("}");
         
-        st->share.struct_or_union_specifier.ident_opt = ident_opt;
-        st->share.struct_or_union_specifier.struct_declaration_list = stdecls; 
-        st->share.struct_or_union_specifier.is_definition = true;
+        // st->share.struct_or_union_specifier.ident_opt = ident_opt;
+        // st->share.struct_or_union_specifier.struct_declaration_list = stdecls; 
+        // st->share.struct_or_union_specifier.is_definition = true;
         // PANIC("is difinition\n");
 
         return st;
     } else {
         if (!ident_opt) FAIL("expected identifier");
         
-        st->share.struct_or_union_specifier.ident_opt = ident_opt; 
-        st->share.struct_or_union_specifier.is_definition = false;
+        // st->share.struct_or_union_specifier.ident_opt = ident_opt; 
+        // st->share.struct_or_union_specifier.is_definition = false;
 
         return st;
     }
@@ -285,14 +364,14 @@ node_t *_struct_declaration() {
     type_list_t *specs = _specifier_qualifier_list();
     if (!specs) return NULL;
 
-    decl_list_t *decls = _struct_declarator_list(specs);
+    // decl_list_t *decls = _struct_declarator_list(specs);
 
     EXPECT(";");
 
     // これこそメタ情報でしかないはず？初期化ないよね？
     node_t *stdecl = new_node(ND_STRUCT_DECLARATION);
-    stdecl->share.struct_declaration.specs = specs;
-    stdecl->share.struct_declaration.struct_declarator_list_opt = decls;
+    // stdecl->share.struct_declaration.specs = specs;
+    // stdecl->share.struct_declaration.struct_declarator_list_opt = decls;
 
     return stdecl;
 }
@@ -320,10 +399,11 @@ decl_list_t *_struct_declarator_list(type_t *base) {
     decl_t *decl = _struct_declarator(base);
     if (!decl) return NULL;
     
-    decl_list_t *decls = (decl_list_t *)calloc(1, sizeof(decl_list_t));
-    decls->self = decl;
+    // decl_list_t *decls = (decl_list_t *)calloc(1, sizeof(decl_list_t));
+    // decls->self = decl;
 
-    return decls;
+    // return decls;
+    return NULL;
 }
 
 // struct-declarator := declarator
@@ -443,11 +523,11 @@ decl_list_t *_parameter_list() {
     decl_t *p = _parameter_declaration();
     if (p) {
         do {
-            decl_list_t *decl = (decl_list_t *)calloc(1, sizeof(decl_list_t));
-            decl->self = p;
+            // decl_list_t *decl = (decl_list_t *)calloc(1, sizeof(decl_list_t));
+            // decl->self = p;
 
-            *tail = decl;
-            tail = &decl->next;
+            // *tail = decl;
+            // tail = &decl->next;
         } while (consume(",") && (p = _parameter_declaration()));
     }
 
@@ -607,7 +687,7 @@ node_t *_compound_statement() {
         node_t *bs = _block_item_list();
         EXPECT("}");
         node_t *cps = new_node(ND_COMPOUND_STATEMENT);
-        cps->share.compound_statement.block_item_list_opt = bs;
+        // cps->share.compound_statement.block_item_list_opt = bs;
         // show_node(cps);
         // exit(1);
         return cps;
@@ -617,23 +697,23 @@ node_t *_compound_statement() {
 }
 
 node_t *_block_item_list() {
-    node_list_t *cur = (node_list_t *)calloc(1, sizeof(node_list_t));
-    node_list_t *head = cur;
+    // node_list_t *cur = (node_list_t *)calloc(1, sizeof(node_list_t));
+    // node_list_t *head = cur;
 
     while (1) {
         node_t *item = _block_item();
         if (!item) break;
 
-        node_list_t *next = (node_list_t *)calloc(1, sizeof(node_list_t));
-        next->self = item;
+        // node_list_t *next = (node_list_t *)calloc(1, sizeof(node_list_t));
+        // next->self = item;
 
-        cur->next = next;
-        cur = next;
+        // cur->next = next;
+        // cur = next;
     }
 
 
     node_t *bil = new_node(ND_BLOCK_ITEM_LIST);
-    bil->share.block_item_list.list = head->next;
+    // bil->share.block_item_list.list = head->next;
 
     return bil;
 }
@@ -655,7 +735,7 @@ node_t *_expression_statement() {
     EXPECT(";");
 
     node_t *es = new_node(ND_EXPRESSION_STATEMENT);
-    es->share.expression_statement.expression_opt = exp;
+    // es->share.expression_statement.expression_opt = exp;
 
     return es;
 }

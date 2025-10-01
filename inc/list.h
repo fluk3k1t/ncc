@@ -57,34 +57,34 @@
         return data;    \
     }
     
-#define LIST_DECLARE(T) _LIST_DECLARE(T)
-#define LIST_DEFINE(T) _LIST_DEFINE(T)
+#define DeriveList(T) _LIST_DECLARE(T)
+#define DefineList(T) _LIST_DEFINE(T)
 
-#define LIST(T) \
+#define List(T) \
     _LIST(T)
 
 #define _LIST(_, ALIAS) \
     LIST_CONTAINER(ALIAS)
 
-#define LIST_NEW(T) \
+#define list_new(T) \
     _LIST_NEW(T)
 
 #define _LIST_NEW(_, ALIAS) \
     F(LIST_CONTAINER(ALIAS), new)()
 
-#define LIST_FOREACH(T,  co, itr) \
+#define list_foreach(T,  co, itr) \
     _LIST_FOREACH(T, co, itr)    
 
 #define _LIST_FOREACH(_, ALIAS,  co, itr) \
     for (LIST_ENTRY(ALIAS) *itr = co->head; itr; itr = itr->next)
 
-#define LIST_PUSH(T, co, data)  \
+#define list_push(T, co, data)  \
     _LIST_PUSH(T, co, data)
 
 #define _LIST_PUSH(_, ALIAS, co, data)  \
     F(LIST_CONTAINER(ALIAS), push)(co, data)
     
-#define LIST_POP(T, co) \
+#define list_pop(T, co) \
     _LIST_POP(T, co)
 
 #define _LIST_POP(_, ALIAS, co) \

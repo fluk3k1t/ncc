@@ -28,7 +28,7 @@ typedef struct {
     int depth, allign;
 } env_stack_t;
 
-void codegen(const char* output_path, node_list_t *nodes);
+void codegen(const char* output_path, List(ref(node_t)) *nodes);
 void _codegen(node_t *node);
 void gen_lvar(node_t *node);
 env_t *find(char *ident, int len);
