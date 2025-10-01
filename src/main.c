@@ -7,7 +7,7 @@
 #include "../inc/list.h"
 
 int main(int argc, char *argv[]) {
-    char *code = "const volatile";
+    char *code = "* const * volatile * * *";
     
     token_t *token = tokenize(code);
     List(ref(Node)) *tree = parse(token);

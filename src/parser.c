@@ -13,6 +13,9 @@ int __context_stack_depth = 0;
 // LIST_DEFINE(ref(node_t))
 DefineList(ref(Specifier))
 DefineList(ref(TypeQualifier))
+DefineList(ref(Pointer))
+DefineList(ref(DirectDeclarator))
+DefineList(ref(DirectDeclaratorSpecifier))
 
 List(ref(node_t)) *parse(token_t *token) {
     __cur = token;
@@ -35,13 +38,27 @@ List(ref(node_t)) *parse(token_t *token) {
     //     printf("%d\n", dspec->data->share.type_specifier);
     // }
     
-    List(ref(TypeQualifier)) *_type_qualifiers = type_qualifier_list();
-    list_foreach(ref(TypeQualifier), _type_qualifiers, itr) {
-        printf("f %d\n", *itr->data);
+    List(ref(Pointer)) *_pointer = pointer();
+    list_foreach(ref(Pointer), _pointer, itr) {
+        printf("pointer \n");
+        list_foreach(ref(TypeQualifier), itr->data->type_qualifier_list, itr2) {
+            printf("f %d\n", *itr2->data);
+        }
     }
 
     // return head;
     return NULL;
+}
+
+Identifier *identifier() {
+    if (__cur->kind != TK_IDENT) return NULL;
+
+    Identifier *_identifier = (Identifier *)calloc(1, sizeof(Identifier));
+    _identifier->str = __cur->str;
+    _identifier->len  = __cur->len;
+    __cur = __cur->next;
+
+    return _identifier;
 }
 
 node_t *_external_declaration() {
@@ -66,7 +83,7 @@ node_t *_function_definition() {
     return fd;
 }
 
-node_t *identifier() {
+node_t *_identifier() {
     if (__cur->kind == TK_IDENT) {
         node_t *ident = new_node(ND_IDENT);
         ident->str = __cur->str;
@@ -95,7 +112,7 @@ node_t *constant() {
 }
 
 node_t *primary_expression() {
-    node_t *ident = identifier();
+    node_t *ident = _identifier();
     if (ident) return ident;
 
     if (__cur->kind == TK_NUM) {
@@ -238,9 +255,43 @@ TypeSpecifier *type_specifier() {
 
 // }
 
-// void *pointer() {
+// direct_declarator := (identifier | "(" declarator ")") direct_declarator_partial*
+// direct_declarator_partial := "[" "]"
+void *direct_declarator() {
+    Identifier *_identifier = TRY(identifier());
+    if (_identifier) {
+        
+    } else {
+        PANIC("todo");
+    }
+}
 
-// }
+void *direct_declarator_partial() {
+    EXPECT("[");
+
+    EXPECT("]");
+
+
+}
+
+// pointer := ("*" type-qualifier-list)+
+List(ref(Pointer)) *pointer() {
+    return Many1(Pointer, pointer_helper());
+}
+
+Pointer *pointer_helper() {
+    if (!consume("*")) FAIL("");
+
+    Pointer *pointer = (Pointer *)calloc(1, sizeof(Pointer));
+    
+    List(ref(TypeQualifier)) *_type_qualifier_list = NULL;
+    _type_qualifier_list = TRY(type_qualifier_list());
+    if (!_type_qualifier_list) _type_qualifier_list = list_new(ref(TypeQualifier));
+    
+    pointer->type_qualifier_list = _type_qualifier_list;
+
+    return pointer;
+}
 
 // void *type_qualifier_list() {
 
@@ -325,7 +376,7 @@ type_t *_struct_or_union_specifier() {
     type_t *st = _struct_or_union();
     if (!st) return st;
 
-    node_t *ident_opt = identifier();
+    node_t *ident_opt = _identifier();
     
     // structのdefとdeclの分岐
     // struct-declaration-listの有無で上位の呼び出しもとで判断
@@ -437,7 +488,7 @@ decl_t *_direct_declarator(type_t *base) {
     token_t *b = __cur;
     type_t *braced = NULL;
 
-    node_t *ident = identifier();
+    node_t *ident = _identifier();
 
     if (!ident) {
         if (consume("(")) {

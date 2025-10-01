@@ -161,6 +161,12 @@ typedef struct VariableDefinition VariableDefinition;
 typedef struct Specifier Specifier;
 DeriveList(ref(Specifier))
 typedef struct InitDeclarator InitDeclarator;
+typedef struct Pointer Pointer;
+DeriveList(ref(Pointer));
+typedef struct DirectDeclarator DirectDeclarator;
+DeriveList(ref(DirectDeclarator))
+typedef struct DirectDeclaratorSpecifier DirectDeclaratorSpecifier;
+DeriveList(ref(DirectDeclaratorSpecifier))
 
 typedef struct node_t node_t;
 typedef struct decl_t decl_t;
@@ -195,10 +201,6 @@ struct Specifier {
     } share;
 };
 
-struct InitDeclarator {
-
-};
-
 #define new_specifier(v) _Generic((v), \
     TypeSpecifier: ({   \
         Specifier *s = (Specifier *)calloc(1, sizeof(Specifier));   \
@@ -207,6 +209,30 @@ struct InitDeclarator {
         s;  \
     })  \
 )
+
+struct InitDeclarator {
+
+};
+
+struct Pointer {
+    List(ref(TypeQualifier)) *type_qualifier_list;
+};
+
+struct DirectDeclarator {
+    enum {
+
+    } kind;
+};
+
+struct DirectDeclaratorSpecifier {
+    enum {
+        DdsArray, DdsFn,
+    } kind;
+
+    union {
+        int dummy;
+    } share;
+};
 
 struct Type {
 
@@ -318,6 +344,8 @@ decl_t *_struct_declarator(type_t *base);
 type_t *_struct_or_union();
 List(ref(Specifier)) *declaration_specifiers();
 TypeSpecifier *type_specifier();
+List(ref(Pointer)) *pointer();
+Pointer *pointer_helper();
 List(ref(TypeQualifier)) *type_qualifier_list();
 TypeQualifier *type_qualifier();
 type_t *_declaration_specifiers();
@@ -327,7 +355,7 @@ decl_t *_init_declarator(type_t *base);
 List(ref(node_t)) *parse(token_t *token);
 node_t *_external_declaration();
 node_t *_function_definition();
-node_t *identifier();
+node_t *_identifier();
 node_t *constant();
 node_t *primary_expression();
 node_t *multiplicative_expression();
