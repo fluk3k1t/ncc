@@ -4,31 +4,36 @@
 #include "../inc/pretty.h"
 #include "../inc/semantics.h"
 #include "../inc/codegen.h"
+#include "../inc/list.h"
+
+LIST_DECLARE(ref(int))
+LIST_DEFINE(ref(int))
 
 int main(int argc, char *argv[]) {
+    LIST(ref(int)) *list = LIST_NEW(ref(int));
+    int b = 8;
+    int *a = &b;
+    LIST_PUSH(ref(int), list, a);
+    int c = 7;
+    int *d = &c;
+    LIST_PUSH(ref(int), list, d);
+    LIST_FOREACH(ref(int), list, itr) {
+        printf("f %d\n", *itr->data);
+    }
+    int *f = LIST_POP(ref(int), list);
+    LIST_FOREACH(ref(int), list, itr) {
+        printf("f %d\n", *itr->data);
+    }
+        int *ff = LIST_POP(ref(int), list);
+    LIST_FOREACH(ref(int), list, itr) {
+        printf("f %d\n", *itr->data);
+    }
+
     char *code = "struct token_t {int val; }; ";
     
     token_t *token = tokenize(code);
-    // show_token(token);
-
     node_list_t *ns = parse(token);
     // __list_int__ a;
-    LIST(int) l = (LIST(int))calloc(1, sizeof(LIST_TYPE(int)));
-    LIST_PUSH(int, l, 1);
-    LIST_PUSH(int, l, 2);
-    LIST_FOREACH(int, l, itr) {
-        printf("f %d\n", itr->inner);
-    }
-    int a = LIST_POP_FRONT(int, l);
-    LIST_FOREACH(int, l, itr) {
-        printf("f %d\n", itr->inner);
-    }    
-    
-    int b = LIST_POP(int, l);
-    LIST_FOREACH(int, l, itr) {
-        printf("f %d\n", itr->inner);
-    }    
-    int c = LIST_POP(int, l);
     // LIST_FOREACH(int, l, itr) {
     //     printf("f %d\n", itr->inner);
     // }
