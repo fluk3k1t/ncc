@@ -14,8 +14,8 @@ int __context_stack_depth = 0;
 DefineList(ref(Specifier))
 DefineList(ref(TypeQualifier))
 DefineList(ref(Pointer))
-DefineList(ref(DirectDeclarator))
-DefineList(ref(DirectDeclaratorSpecifier))
+DefineList(ref(Type))
+DefineList(ref(InitDeclarator))
 
 List(ref(node_t)) *parse(token_t *token) {
     __cur = token;
@@ -38,13 +38,16 @@ List(ref(node_t)) *parse(token_t *token) {
     //     printf("%d\n", dspec->data->share.type_specifier);
     // }
     
-    List(ref(Pointer)) *_pointer = pointer();
-    list_foreach(ref(Pointer), _pointer, itr) {
-        printf("pointer \n");
-        list_foreach(ref(TypeQualifier), itr->data->type_qualifier_list, itr2) {
-            printf("f %d\n", *itr2->data);
-        }
-    }
+    // List(ref(Pointer)) *_pointer = pointer();
+    // list_foreach(ref(Pointer), _pointer, itr) {
+    //     printf("pointer \n");
+    //     list_foreach(ref(TypeQualifier), itr->data->type_qualifier_list, itr2) {
+    //         printf("f %d\n", *itr2->data);
+    //     }
+    // }
+
+    Type *t = declarator(NULL);
+    show_type(t);
 
     // return head;
     return NULL;
@@ -220,7 +223,7 @@ VariableDefinition *declaration() {
     List(ref(Specifier)) *_declaration_specifiers = declaration_specifiers();
     if (!_declaration_specifiers) FAIL("");
 
-
+    List(ref(InitDeclarator)) *init_declarator_list_opt = init_declarator_list(NULL);
 
     return NULL;
 }
@@ -237,6 +240,23 @@ List(ref(Specifier)) *declaration_specifiers() {
     return specs;
 }
 
+List(ref(InitDeclarator)) *init_declarator_list(Type *base) {
+    return Many1(InitDeclarator, init_declarator(base));
+}
+
+// init-declarator := declarator ("=" initializer)?
+InitDeclarator *init_declarator(Type *base) {
+    Type *_declarator = TRY(declarator());
+    if (!_declarator) FAIL("");
+
+    InitDeclarator *_init_declarator = (InitDeclarator *)calloc(1, sizeof(InitDeclarator));
+    _init_declarator->declarator = _declarator;
+
+    if (!consume("=")) return _init_declarator;
+
+    PANIC("todo");
+}
+
 TypeSpecifier *type_specifier() {
     TypeSpecifier *ts = (TypeSpecifier *)calloc(1, sizeof(TypeSpecifier));
 
@@ -251,31 +271,57 @@ TypeSpecifier *type_specifier() {
 
 // }
 
-// void *declarator() {
+Type *declarator(Type *base) {
+    List(ref(Pointer)) *ptr_opt = pointer(base);
+    Type *_declarator = TRY(direct_declarator(base));
+    if (!_declarator) FAIL("");
 
-// }
+    return _declarator;
+}
 
 // direct_declarator := (identifier | "(" declarator ")") direct_declarator_partial*
 // direct_declarator_partial := "[" "]"
-void *direct_declarator() {
+Type *direct_declarator(Type *base) {
     Identifier *_identifier = TRY(identifier());
     if (_identifier) {
-        
+
     } else {
         PANIC("todo");
     }
+
+    List(ref(Type)) *types = TRY(Many1(Type, direct_declarator_partial()));
+    if (!types) return base;
+
+    // Type *base = list_pop(ref(Type), types);
+    list_foreach(ref(Type), types, itr) {
+        Type *type = itr->data;
+        switch (type->kind) {
+            case TkPtr:
+                type->share.ptr.to = base;
+                break;
+            case TkArr:
+                type->share.arr.to = base;
+                break;
+            default:
+                break;
+        }
+        base = type;
+    }
+
+    return base;
 }
 
-void *direct_declarator_partial() {
+Type *direct_declarator_partial() {
     EXPECT("[");
 
     EXPECT("]");
+    Type *arr = new_type(TkArr);
 
-
+    return arr;
 }
 
 // pointer := ("*" type-qualifier-list)+
-List(ref(Pointer)) *pointer() {
+List(ref(Pointer)) *pointer(Type *base) {
     return Many1(Pointer, pointer_helper());
 }
 
@@ -353,11 +399,11 @@ decl_t *_init_declarator(type_t *base) {
 }
 
 type_t *_type_specifier() {
-    if (type("void"))           return new_type(VOID);
-    else if (type("char"))      return new_type(CHAR);
-    else if (type("short"))     return new_type(SHORT);
-    else if (type("int"))       return new_type(INT);
-    else if (type("long"))      return new_type(LONG);
+    if (type("void"))           return _new_type(VOID);
+    else if (type("char"))      return _new_type(CHAR);
+    else if (type("short"))     return _new_type(SHORT);
+    else if (type("int"))       return _new_type(INT);
+    else if (type("long"))      return _new_type(LONG);
     else if (type("float"))     PANIC("todo!()\n");
     else if (type("double"))    PANIC("todo!()\n");
     else if (type("signed"))    PANIC("todo!()\n");
@@ -465,8 +511,8 @@ decl_t *_struct_declarator(type_t *base) {
 
 // struct-or-union := "struct" | "union"
 type_t *_struct_or_union() {
-    if      (type("struct"))    return new_type(STRUCT);
-    else if (type("union"))     return new_type(UNION);
+    if      (type("struct"))    return _new_type(STRUCT);
+    else if (type("union"))     return _new_type(UNION);
     else                           return NULL; 
 }
 
@@ -513,13 +559,13 @@ decl_t *_direct_declarator(type_t *base) {
     while (1) {
         if (consume("[")) {
             EXPECT("]");
-            type_t *arr = new_type(ARRAY);
+            type_t *arr = _new_type(ARRAY);
             arr->array_to = base;
             base = arr;
         } else if (consume("(")) {
             decl_list_t *ps = _parameter_list();
             EXPECT(")");
-            type_t *fn = new_type(FUN);
+            type_t *fn = _new_type(FUN);
             fn->params = ps;
             fn->ret = base;
             base = fn;
@@ -632,13 +678,13 @@ decl_t *_direct_abstract_declarator(type_t *base) {
     while (1) {
         if (consume("[")) {
             EXPECT("]");
-            type_t *arr = new_type(ARRAY);
+            type_t *arr = _new_type(ARRAY);
             arr->array_to = base;
             base = arr;
         } else if (consume("(")) {
             decl_list_t *ps = _parameter_list();
             EXPECT(")");
-            type_t *fn = new_type(FUN);
+            type_t *fn = _new_type(FUN);
             fn->params = ps;
             fn->ret = base;
             base = fn;
@@ -658,7 +704,7 @@ decl_t *_direct_abstract_declarator(type_t *base) {
                 } else if (tail->kind == FUN) {
                     tail = tail->ret;
                 } else {
-                    // show_type(tail);
+                    // _show_type(tail);
                     PANIC("unreachable");
                 }
             } else {
@@ -690,7 +736,7 @@ type_t *_pointer(type_t *base) {
     type_t *head = base;
 
     while (consume("*")) {
-        type_t *ptr = new_type(PTR);
+        type_t *ptr = _new_type(PTR);
         ptr->ptr_to = base;
         base = ptr;
     }
@@ -875,8 +921,16 @@ node_t *new_node(node_kind_t kind) {
     return node;
 }
 
-type_t *new_type(type_kind_t kind) {
+type_t *_new_type(type_kind_t kind) {
     type_t *type = (type_t *)calloc(1, sizeof(type_t));
+    type->kind = kind;
+
+    return type;
+}
+
+
+Type *new_type(TypeKind kind) {
+    Type *type = (Type *)calloc(1, sizeof(Type));
     type->kind = kind;
 
     return type;

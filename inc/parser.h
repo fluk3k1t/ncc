@@ -140,6 +140,10 @@ typedef enum {
 } node_kind_t;
 
 typedef enum {
+    TkChar, TkInt, TkPtr, TkArr,
+} TypeKind;
+
+typedef enum {
     Dummy,
 } NodeKind;
 
@@ -161,13 +165,11 @@ typedef struct VariableDefinition VariableDefinition;
 typedef struct Specifier Specifier;
 DeriveList(ref(Specifier))
 typedef struct InitDeclarator InitDeclarator;
+DeriveList(ref(InitDeclarator))
 typedef struct Pointer Pointer;
-DeriveList(ref(Pointer));
-typedef struct DirectDeclarator DirectDeclarator;
-DeriveList(ref(DirectDeclarator))
-typedef struct DirectDeclaratorSpecifier DirectDeclaratorSpecifier;
-DeriveList(ref(DirectDeclaratorSpecifier))
-
+DeriveList(ref(Pointer))
+typedef struct Type Type;
+DeriveList(ref(Type))
 typedef struct node_t node_t;
 typedef struct decl_t decl_t;
 typedef struct decl_list_t decl_list_t;
@@ -180,6 +182,20 @@ DeriveList(ref(Node))
 struct Node {
     NodeKind kind;
     Identifier *ident;
+};
+
+struct Type {
+    TypeKind kind;
+
+    union {
+        struct {
+            Type *to;
+        } ptr;
+
+        struct {
+            Type *to;
+        } arr;
+    } share;
 };
 
 struct VariableDefinition {
@@ -211,7 +227,8 @@ struct Specifier {
 )
 
 struct InitDeclarator {
-
+    Type *declarator;
+    void *initializer;
 };
 
 struct Pointer {
@@ -220,7 +237,7 @@ struct Pointer {
 
 struct DirectDeclarator {
     enum {
-
+        dm
     } kind;
 };
 
@@ -232,10 +249,6 @@ struct DirectDeclaratorSpecifier {
     union {
         int dummy;
     } share;
-};
-
-struct Type {
-
 };
 
 struct Identifier {
@@ -343,11 +356,16 @@ decl_list_t *_struct_declarator_list(type_t *base);
 decl_t *_struct_declarator(type_t *base);
 type_t *_struct_or_union();
 List(ref(Specifier)) *declaration_specifiers();
+List(ref(InitDeclarator)) *init_declarator_list(Type *base);
+InitDeclarator *init_declarator(Type *base);
 TypeSpecifier *type_specifier();
-List(ref(Pointer)) *pointer();
+List(ref(Pointer)) *pointer(Type *base);
 Pointer *pointer_helper();
 List(ref(TypeQualifier)) *type_qualifier_list();
 TypeQualifier *type_qualifier();
+Type *declarator(Type *base);
+Type *direct_declarator(Type *base);
+Type *direct_declarator_partial();
 type_t *_declaration_specifiers();
 decl_list_t *_init_declarator_list(type_t *base);
 decl_t *_init_declarator(type_t *base);
@@ -383,7 +401,7 @@ bool peek(char *op);
 bool type(char *c);
 bool peek_type(char *name);
 char *peek_types(char *names[], int len);
-type_t *new_type(type_kind_t kind);
-
+type_t *_new_type(type_kind_t kind);
+Type *new_type(TypeKind kind);
 
 #endif

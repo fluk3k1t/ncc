@@ -46,12 +46,12 @@ void show_node_with_indent(node_t *node, int level) {
             break;
         case ND_STRUCT_DECLARATION:
             put_indent(level); printf("ND_STRUCT_DECLARATION\n");
-            // show_type(node->share.struct_declaration.struct_declarator_list_opt->self->decl);
+            // _show_type(node->share.struct_declaration.struct_declarator_list_opt->self->decl);
             printf("\n");
             break;
         case ND_FUNCTION_DEFINITION: 
             put_indent(level); printf("ND_FUNCTION_DEFINITION: \n");
-            // put_indent(level + 1); show_type(node->share.function_difinition.decl->decl); printf("\n");
+            // put_indent(level + 1); _show_type(node->share.function_difinition.decl->decl); printf("\n");
             // show_node_with_indent(node->share.function_difinition.cs, level + 1);
             break;
         case ND_DECLARATION:
@@ -62,7 +62,7 @@ void show_node_with_indent(node_t *node, int level) {
             //     } else {
             //         PANIC("expected ident\n");
             //     }
-            //     show_type(cur->self->decl);
+            //     _show_type(cur->self->decl);
             //     if (cur->self->init) {
             //         put_indent(level + 1); printf("init: \n");
             //         show_node_with_indent(cur->self->init, level + 2);
@@ -70,7 +70,7 @@ void show_node_with_indent(node_t *node, int level) {
             //     printf("\n");
             // }
             // if (node->share.declaration.struct_declaration) {
-            //     put_indent(level + 1); show_type(node->share.declaration.struct_declaration);
+            //     put_indent(level + 1); _show_type(node->share.declaration.struct_declaration);
             //     printf("\n");
             // }
             break;
@@ -101,9 +101,9 @@ void show_node_with_indent(node_t *node, int level) {
     }
 }
 
-void show_type(type_t *t) {
+void _show_type(type_t *t) {
     if (!t) {
-        PANIC("show_type: NULL\n");
+        PANIC("_show_type: NULL\n");
     }
 
     switch (t->kind) {
@@ -115,23 +115,23 @@ void show_type(type_t *t) {
             break;
         case PTR:
             printf("* -> (");
-            show_type(t->ptr_to);
+            _show_type(t->ptr_to);
             printf(")");
             break;
         case ARRAY:
             printf("[] -> (");
-            show_type(t->array_to);
+            _show_type(t->array_to);
             printf(")");
             break;
         case FUN:
             printf("fn(");
             // for (decl_list_t *cur = t->params; cur; cur = cur->next) {
-            //     // show_type(cur->self->decl);
+            //     // _show_type(cur->self->decl);
             //     // if (cur->next)
             //     //     printf(", ");
             // }
             printf(") -> (");
-            show_type(t->ret);
+            _show_type(t->ret);
             printf(")");
             break;
         case STRUCT:
@@ -149,5 +149,26 @@ void show_type(type_t *t) {
         default:
             printf("default\n");
             break;
+    }
+}
+
+void show_type(Type *type) {
+    if (!type) PANIC("type is null");
+
+    switch (type->kind) {
+        case TkChar:
+            printf("char");
+            break;
+        case TkPtr:
+            printf("* -> (");
+            show_type(type->share.ptr.to);
+            printf(")");
+            break;
+        case TkArr:
+            printf("[] -> (");
+            show_type(type->share.arr.to);
+            printf(")");
+        default:
+            printf("default");
     }
 }
