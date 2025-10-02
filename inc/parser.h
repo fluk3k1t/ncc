@@ -70,11 +70,13 @@ extern int __context_stack_depth;
 
 #define _Many1(T, p) \
 ({  \
+        printf("try to 0 " #p "\n");  \
     __auto_type _e = (TRY(p));   \
-    if (!_e) FAIL("");  \
+    if (!_e) FAIL("---------- many1 tried to " #p);  \
     _LIST(T) *_es = _LIST_NEW(T); \
     _LIST_PUSH(T, _es, _e); \
     do {    \
+        printf("try to 1 " #p "\n");  \
         __auto_type _v = (TRY(p));   \
         if (_v) _LIST_PUSH(T, _es, _v);   \
         else break; \ 

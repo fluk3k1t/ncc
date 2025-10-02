@@ -17,7 +17,7 @@ TEST_SRC := $(wildcard $(TEST_DIR)/*.c)
 TEST_OBJ := $(patsubst $(TEST_DIR)/%.c,$(TEST_OBJDIR)/%.o,$(TEST_SRC))
 
 CC      := g++
-CFLAGS  := -x c -Wall -I$(INC_DIR)
+CFLAGS  := -E -x c -Wall -I$(INC_DIR)
 LDFLAGS :=
 LDLIBS  := -lgtest_main -lgtest -lpthread
 

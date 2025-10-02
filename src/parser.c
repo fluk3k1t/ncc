@@ -55,7 +55,7 @@ List(ref(node_t)) *parse(token_t *token) {
 
     list_foreach(ref(InitDeclarator), _init_declarator_list, itr) {
         Type *type = itr->data->declarator;
-        show_type(type);
+        // show_type(type);
     }
 
     // return head;
@@ -326,8 +326,8 @@ Type *declarator(Type *base) {
     List(ref(Pointer)) *ptr_opt = pointer(base);
     // PANIC("here");
     Type *_direct_declarator = TRY(direct_declarator(base));
-    show_type(_direct_declarator);
-    PANIC("here");
+    // show_type(_direct_declarator);
+    // PANIC("here");
     if (!_direct_declarator) FAIL("");
     
 
@@ -343,8 +343,11 @@ Type *direct_declarator(Type *base) {
     } else {
         // PANIC("todo");
     }
-
+    
     List(ref(Type)) *types = TRY(Many1(Type, direct_declarator_partial()));
+    PANIC("here");
+    exit(1);
+    
     if (!types) return base;
 
     // Type *base = list_pop(ref(Type), types);
